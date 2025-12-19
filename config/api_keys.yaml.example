@@ -1,0 +1,35 @@
+# API 密钥配置文件示例
+# 使用说明：
+# 1. 复制本文件为 api_keys.yaml
+# 2. 填写你的真实 API 密钥
+# 3. 确保 api_keys.yaml 已添加到 .gitignore（不要提交到版本控制）
+
+# DeepSeek API 配置
+deepseek:
+  api_key: "sk-your-deepseek-api-key-here"
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-chat"  # deepseek-chat 是正确的模型名称
+
+# Qwen API 配置 (DashScope)
+qwen:
+  api_key: "sk-your-qwen-api-key-here"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  model: "qwen-plus"  # qwen-max(最强) | qwen-plus(均衡,推荐) | qwen-flash(最快)
+
+# Gemini API 配置
+gemini:
+  api_key: "your-gemini-api-key-here"
+  model: "gemini-pro"  # gemini-pro | gemini-1.5-pro | gemini-1.5-flash
+
+# OpenAI API 配置（可选）
+openai:
+  api_key: "sk-your-openai-api-key-here"
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-4o-mini"  # gpt-4o | gpt-4o-mini | gpt-3.5-turbo
+
+# AgentScope 配置
+agentscope:
+  studio_url: "http://127.0.0.1:5000"
+  save_dir: "./runs"
+  use_monitor: true
+  cache_dir: "./cache"

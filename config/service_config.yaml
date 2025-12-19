@@ -1,0 +1,13 @@
+intelligence_service_port: 8001
+bd_service_port: 8002
+rd_service_port: 8003
+
+# 存储后端选择（模式 B：轻量开发模式）
+es_backend: "local_file"      # 可选: local_file | remote_es
+vector_backend: "chroma"      # 可选: none | chroma | milvus
+
+# 远程服务配置（模式 C：生产模式）
+es_url: null
+vector_url: null
+rdb_url: null
+redis_url: null

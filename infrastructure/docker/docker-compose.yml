@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  intelligence_service:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/intelligence_service.Dockerfile
+    ports:
+      - "8001:8001"
+    env_file:
+      - ../../.env
+    networks:
+      - lingnexus_net
+
+  bd_service:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/bd_service.Dockerfile
+    ports:
+      - "8002:8002"
+    env_file:
+      - ../../.env
+    networks:
+      - lingnexus_net
+
+  rd_service:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/rd_service.Dockerfile
+    ports:
+      - "8003:8003"
+    env_file:
+      - ../../.env
+    networks:
+      - lingnexus_net
+
+networks:
+  lingnexus_net:
+    driver: bridge

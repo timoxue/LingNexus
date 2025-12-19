@@ -1,0 +1,71 @@
+# ==========================================
+# LingNexus 大模型配置文件
+# ==========================================
+# 说明：
+# 1. 优先使用 api_keys.yaml 中的配置（推荐）
+# 2. 如果 api_keys.yaml 中没有配置，则使用本文件的配置
+# 3. 支持的模型：deepseek, qwen, gemini, openai
+# ==========================================
+
+# 默认使用的大模型（可选值：deepseek | qwen | gemini | openai）
+default_llm: deepseek
+
+# 备用模型配置（仅当不使用 api_keys.yaml 时生效）
+# 如果已在 api_keys.yaml 中配置，以下配置会被覆盖
+models:
+  # ========== DeepSeek 配置 ==========
+  deepseek:
+    api_base: "https://api.deepseek.com"
+    model_name: "deepseek-chat"
+    api_key_env: "DEEPSEEK_API_KEY"  # 从环境变量读取（如果不使用 api_keys.yaml）
+    description: "DeepSeek 模型 - 性价比高，推理能力强"
+    max_tokens: 4096
+    temperature: 0.7
+
+  # ========== Qwen 配置 ==========
+  qwen:
+    api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model_name: "qwen-max"  # qwen-max | qwen-plus | qwen-turbo | qwen-flash
+    api_key_env: "QWEN_API_KEY"  # 从环境变量读取
+    description: "通义千问 - 阿里云大模型，中文能力强"
+    max_tokens: 8000
+    temperature: 0.7
+    # 可选模型列表：
+    # - qwen-max: 最强性能，适合复杂任务
+    # - qwen-plus: 性能与成本均衡（推荐）
+    # - qwen-turbo: 快速响应
+    # - qwen-flash: 极速，适合简单任务
+
+  # ========== Gemini 配置 ==========
+  gemini:
+    api_base: "https://generativelanguage.googleapis.com/v1beta"
+    model_name: "gemini-1.5-pro"  # gemini-1.5-pro | gemini-1.5-flash | gemini-pro
+    api_key_env: "GEMINI_API_KEY"  # 从环境变量读取
+    description: "Google Gemini - 多模态能力强，支持长上下文"
+    max_tokens: 8192
+    temperature: 0.7
+    # 注意：Gemini API 端点格式特殊，需要特殊处理
+    # 实际调用地址: {api_base}/models/{model}:generateContent
+
+  # ========== OpenAI 配置（可选）==========
+  openai:
+    api_base: "https://api.openai.com/v1"
+    model_name: "gpt-4o-mini"  # gpt-4o | gpt-4o-mini | gpt-4-turbo | gpt-3.5-turbo
+    api_key_env: "OPENAI_API_KEY"  # 从环境变量读取
+    description: "OpenAI GPT 系列 - 综合能力强"
+    max_tokens: 4096
+    temperature: 0.7
+
+# ==========================================
+# 模型调用优先级说明
+# ==========================================
+# 1. llm_manager 会按以下顺序查找配置：
+#    a) api_keys.yaml 中的 {provider}.api_key
+#    b) 环境变量 {API_KEY_ENV}
+#    c) model_config.yaml 中的配置
+#
+# 2. 推荐使用方式：
+#    - 开发环境：使用 api_keys.yaml（方便管理多个密钥）
+#    - 生产环境：使用环境变量（更安全）
+#    - CI/CD 环境：使用环境变量
+# ==========================================
