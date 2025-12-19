@@ -17,7 +17,7 @@ class LLMManager:
 
     def __init__(self) -> None:
         self._api_keys = settings.api_keys
-        self._model_config = settings.model_config
+        self._model_config = settings.llm_model_config
         self._default_model_name = self._model_config.default_llm
         self._client = httpx.AsyncClient(timeout=60.0)
 

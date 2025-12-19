@@ -239,11 +239,47 @@ intelligence_summary_v1:
     {context}
     
     请输出结构化的分析结果。
+
+intelligence_daily_digest_v1:
+  description: "情报订阅日报 - 按主题聚合 Top 资讯并支持角色个性化"
+  version: 1
+  recommended_model: "deepseek"
+  locale: "zh-CN"
+  template: |
+    你是一个面向医药行业从业者的「订阅日报」撰写助手，需要根据给定主题和候选资讯，生成结构化的订阅日报内容。
+
+    当前本次日报的主要阅读角色是：{target_role}
+    （如果未指定角色，你可以面向“综合读者”进行撰写。）
+
+    【订阅主题】
+    {topic_name}
+
+    【主题说明】
+    {topic_description}
+
+    【候选资讯列表】
+    {news_items}
+
+    【写作要求】
+    1. 先给出本主题下的整体形势短评（100-200 字），说明近期的关键趋势与看点；
+    2. 按重要性列出 3-10 条重点资讯，每条包含标题、1-3 句专业总结、来源和时间；
+    3. 结合 {target_role} 调整侧重点，并在末尾加入该角色视角的「机会与风险提示」；
+    4. 使用专业但易读的中文，避免出现“模型/Prompt”等技术细节。
 ```
 
 ---
 
 ### 3. 扩展 shared 层能力
+
+在订阅日报场景中，核心的共享组件包括：
+
+- `shared/storage/es_client.py`：
+  - 在 **模式 A/B** 下通过本地 JSON 文件（如 `clinical_trials.json`、`pharma_news.json`）模拟 ES；
+  - 在 **模式 C** 下可切换为真实 Elasticsearch；
+- `shared/knowledge/vector_store.py`：
+  - 支持 `none` / `chroma` / `milvus` 等后端，供后续 RAG/相似度检索使用；
+- `shared/prompts/intelligence.yaml`：
+  - 统一管理情报相关 Prompt，包括 `intelligence_summary_v1` 和 `intelligence_daily_digest_v1` 等。
 
 **新增数据源客户端（shared/storage/）**：
 ```python

@@ -139,7 +139,7 @@ LingNexus/
 # 克隆项目（或解压到本地）
 cd LingNexus
 
-# 创建虚拟环境（推荐）
+# 创建虚拟环境（推荐，本地安装python3.10.x版本）
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
@@ -278,17 +278,9 @@ docker-compose up --build
 - BD 服务：`http://localhost:8002`
 - RD 服务：`http://localhost:8003`
 
-### 6. 访问 API 文档
+### 6. 情报服务接口示例
 
-启动后访问以下地址查看 Swagger 交互式文档：
-
-- 情报服务文档：http://localhost:8001/docs
-- BD 服务文档：http://localhost:8002/docs
-- RD 服务文档：http://localhost:8003/docs
-
-### 7. 测试接口
-
-使用 curl 或 Postman 测试：
+#### 6.1 情报分析接口（外部）
 
 ```bash
 curl -X POST "http://localhost:8001/intelligence/analyze" \
@@ -298,6 +290,51 @@ curl -X POST "http://localhost:8001/intelligence/analyze" \
     "context": "关注近三年的III期临床",
     "top_k": 5
   }'
+```
+
+#### 6.2 订阅日报接口（内部，供 n8n 调用）
+
+- 路径：`POST /v1/internal/daily_digest`
+- 用途：根据 **主题列表 + 用户列表** 生成情报订阅日报，可按角色（BD/医学/市场等）生成多版本摘要。
+- 示例请求：
+
+```json
+{
+  "topics": [
+    {
+      "topic_id": "t1",
+      "name": "PD-1 肺癌",
+      "description": "关注 PD-1 相关的肺癌适应症与临床进展",
+      "keywords": ["PD-1", "肺癌", "NSCLC"],
+      "max_items": 5
+    }
+  ],
+  "users": [
+    {
+      "user_id": "u_bd",
+      "email": "bd@example.com",
+      "subscribed_topics": ["t1"],
+      "role": "bd"
+    }
+  ]
+}
+```
+
+返回示例（结构）：
+
+```json
+{
+  "task_id": "daily_xxx",
+  "status": "completed",
+  "items": [
+    {
+      "topic": { "topic_id": "t1", "name": "PD-1 肺癌", "max_items": 5 },
+      "news": [ { "id": "NEWS_0001", "title": "..." } ],
+      "digest_summary": "这里是一整篇可直接推送的订阅日报文本",
+      "role": "bd"
+    }
+  ]
+}
 ```
 
 ---

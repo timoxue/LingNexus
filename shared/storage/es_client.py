@@ -40,6 +40,16 @@ class ESClient:
         else:
             self._local_data["clinical_trials"] = []
             logger.warning(f"Clinical trials file not found: {clinical_trials_file}")
+
+        # 加载医药资讯数据（订阅日报用）
+        pharma_news_file = data_dir / "pharma_news.json"
+        if pharma_news_file.exists():
+            with pharma_news_file.open("r", encoding="utf-8") as f:
+                self._local_data["pharma_news"] = json.load(f)
+                logger.info(f"Loaded {len(self._local_data['pharma_news'])} pharma news items from local file")
+        else:
+            self._local_data["pharma_news"] = []
+            logger.warning(f"Pharma news file not found: {pharma_news_file}")
         
         # 预留其他数据集加载逻辑
         logger.info("Local file backend initialized", extra={"indexes": list(self._local_data.keys())})

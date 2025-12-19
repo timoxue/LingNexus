@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 项目根目录（假设 settings.py 在 config/ 下）
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -68,14 +68,9 @@ class Settings(BaseSettings):
 
     # 嵌套配置（从 YAML 加载）
     api_keys: APIKeysConfig = Field(default_factory=APIKeysConfig)
-    model_config: ModelConfig = Field(default_factory=ModelConfig)
+    llm_model_config: ModelConfig = Field(default_factory=ModelConfig)
     agentscope_config: AgentScopeConfig = Field(default_factory=AgentScopeConfig)
     service_config: ServiceConfig = Field(default_factory=ServiceConfig)
-
-    class Config:
-        env_file = BASE_DIR / ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
 
     @classmethod
     def load(cls) -> "Settings":
@@ -92,7 +87,7 @@ class Settings(BaseSettings):
 
         # 合并到嵌套配置（允许环境变量覆盖 YAML）
         settings.api_keys = APIKeysConfig(**api_keys_yaml)
-        settings.model_config = ModelConfig(**model_yaml, _env_prefix="MODEL_")
+        settings.llm_model_config = ModelConfig(**model_yaml, _env_prefix="MODEL_")
         settings.agentscope_config = AgentScopeConfig(**agentscope_yaml, _env_prefix="AGENT_")
         settings.service_config = ServiceConfig(**service_yaml, _env_prefix="SERVICE_")
 
