@@ -27,7 +27,7 @@ LingNexus 是一个面向医药行业的 AI 智能服务平台，旨在通过微
 
 - **Python**: 3.10
 - **Web 框架**: FastAPI + Uvicorn
-- **Agent 框架**: AgentScope >= 0.5.0
+- **Agent 框架**: AgentScope >= 1.0.0
 - **配置管理**: Pydantic Settings + python-dotenv + PyYAML
 - **HTTP 客户端**: httpx
 - **数据存储**: Elasticsearch（结构化数据）+ 向量数据库（语义检索）+ MySQL/PostgreSQL（关系数据）

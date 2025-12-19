@@ -9,7 +9,7 @@
 - **项目名称**: LingNexus
 - **语言**: Python 3.10
 - **架构模式**: 微服务 + 分层架构
-- **主要框架**: FastAPI + AgentScope + Pydantic
+- **主要框架**: FastAPI + AgentScope >= 1.0.0 + Pydantic
 - **部署方式**: Docker + docker-compose
 - **业务领域**: 医药行业 AI 智能服务（情报分析、BD、药物研发）
 
