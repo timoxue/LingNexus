@@ -51,7 +51,9 @@ sequenceDiagram
     participant API as intelligence_service/api.py
     participant WF as DailyDigestWorkflow
     participant R as RetrievalAgent
+    participant SF as "FetchNewsSkill (intel.fetch_news)"
     participant A as AnalysisAgent
+    participant SD as "GenerateDailyDigestSkill (intel.generate_daily_digest)"
     participant Storage as shared/storage
     participant Knowledge as shared/knowledge
     participant DB as 业务数据库/持久化
@@ -59,13 +61,16 @@ sequenceDiagram
     N8N->>API: POST /v1/internal/daily_digest(主题列表, 用户列表)
     API->>WF: 调用 run_daily_digest(request)
     WF->>R: 针对每个 Topic 调用 fetch_news_for_topic
-    R->>Storage: query_news_by_topic(topic, keywords)
-    R->>Knowledge: （预留）hybrid_retrieval(topic, es_results)
-    R-->>WF: 返回原始资讯列表 NewsItem[]
-    WF->>A: build_digest(topic, news_list, users)
-    A->>A: 去重、排序、组装 news_items 文本
-    A->>A: 调用 PromptManager + LLM 生成 digest_summary
-    A-->>WF: 返回 DailyDigestItem
+    R->>SF: execute(FetchNewsInput)
+    SF->>Storage: query_news_by_topic(topic, keywords)
+    SF->>Knowledge: （预留）hybrid_retrieval(topic, es_results)
+    SF-->>R: 返回原始资讯列表 (dict[])
+    R-->>WF: 转换为 NewsItem[]
+    WF->>A: build_digest(topic, news_list, users, role)
+    A->>SD: execute(DailyDigestInput)
+    SD->>SD: 内部调用 PromptManager + LLM 生成 digest_summary
+    SD-->>A: 返回订阅日报文本
+    A-->>WF: 组装 DailyDigestItem
     WF->>DB: 存储日报结果（可选）
     WF-->>API: 返回 DailyDigestResponse(task_id, items)
     API-->>N8N: 返回任务ID/结果
