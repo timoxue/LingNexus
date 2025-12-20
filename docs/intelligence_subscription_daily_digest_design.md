@@ -26,7 +26,7 @@
 - **`intelligence_service/api.py`**：情报服务 API 层，对外暴露 HTTP 接口。
 - **情报工作流（workflow）**：
   - 已有：`run_intelligence_pipeline`（分析一个 query）；
-  - 规划中：`run_daily_digest`（针对多个订阅主题生成日报）。
+  - 已实现：`run_daily_digest`（针对多个订阅主题生成日报，对外通过 `POST /v1/internal/daily_digest` 暴露接口，对应文件 `core_agents/intelligence_service/workflows/daily_digest_workflow.py`）。
 - **检索智能体 `RetrievalAgent`**：
   - 位置：[retrieval_agent.py](file:///d:/LingNexus/core_agents/intelligence_service/agents/retrieval_agent.py)
   - 职责：基于主题从 ES/local_file 数据中检索相关医药资讯。
