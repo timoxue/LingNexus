@@ -174,7 +174,7 @@ sequenceDiagram
 
 ---
 
-### 四、核心智能体设计
+### 四、核心智能体与 Skill 设计
 
 #### 4.1 RetrievalAgent（检索智能体）
 
@@ -183,19 +183,21 @@ sequenceDiagram
   - `async def fetch_news_for_topic(self, topic: TopicConfig) -> List[NewsItem]`
 - 主要逻辑：
   1. 从 `TopicConfig` 中取出 `keywords`，如为空则使用 `topic.name`；
-  2. 调用 `query_news_by_topic(es_client, topic.name, keywords, top_k=topic.max_items)`：
-     - 该函数定义在 [es_query_medical.py](file:///d:/LingNexus/shared/storage/es_query_medical.py)；
-     - 内部构造 ES `query_string` 查询，索引固定为 `pharma_news`；
-  3. 将返回的 dict 列表转为 `NewsItem` 列表，补充必要字段；
-  4. 输出给 workflow 或 AnalysisAgent。
+  2. 优先通过 `SkillRegistry` 调用资讯检索技能：
+     - `skill = get_skill("intel.fetch_news")`
+     - 构造 `FetchNewsInput(topic_name=topic.name, keywords=keywords, max_items=topic.max_items)`；
+     - 调用 `await skill.execute(input_data)` 获取原始资讯列表；
+     - 若技能未注册，则回退到 `fetch_raw_news_for_topic(...)` 函数封装；
+  3. 将返回的原始 dict 列表转为 `NewsItem` 列表，补充必要字段；
+  4. 输出给 workflow 或 `AnalysisAgent`。
 
-> 设计理念：检索智能体**屏蔽底层数据源差异**（local_file / 真 ES），只对外提供统一的医药资讯列表。
+> 设计理念：检索智能体**专注领域模型与调用编排**，具体“如何查”由 `shared/skills/intelligence/fetch_news.py` 中的 `FetchNewsSkill` 决定。
 
 #### 4.2 AnalysisAgent（分析智能体）
 
 - 文件：[analysis_agent.py](file:///d:/LingNexus/core_agents/intelligence_service/agents/analysis_agent.py)
 - 对外方法：
-  - `async def build_digest(self, topic: TopicConfig, news_list: List[NewsItem], users: List[UserConfig] | None) -> DailyDigestItem`
+  - `async def build_digest(self, topic: TopicConfig, news_list: List[NewsItem], users: List[UserConfig] | None, role: str | None) -> DailyDigestItem`
 - 主要逻辑：
   1. **去重**：
      - 以 `url` 为主键；如果没有 URL，则退化为 `title`；
@@ -209,18 +211,16 @@ sequenceDiagram
        - `来源/日期`
        - `摘要`
        - `链接`
-     - 用空行分隔，整体作为 `{news_items}` 传入 Prompt。
-  4. **调用订阅日报 Prompt + LLM**：
-     - 在 [intelligence.yaml](file:///d:/LingNexus/shared/prompts/intelligence.yaml) 中使用 `intelligence_daily_digest_v1`：
-       - `{topic_name}` 来自 `topic.name`；
-       - `{topic_description}` 来自 `topic.description`；
-       - `{news_items}` 为上一步拼装的候选资讯文本；
-     - 借助 `PromptManager` 渲染完整的 system prompt；
-     - 使用 `llm_manager.chat(...)` 调用推荐模型（当前配置为 `deepseek`），生成订阅日报；
+     - 用空行分隔，整体作为 `{news_items}` 传入 Skill；
+  4. **调用订阅日报生成 Skill + LLM**：
+     - 优先从 SkillRegistry 获取 `intel.generate_daily_digest`：
+       - 构造 `DailyDigestInput(topic_name=topic.name, topic_description=topic.description or "", news_items_text=news_items_str, role=role)`；
+       - 调用 `await skill.execute(input_data)` 获取订阅日报文本；
+     - 若技能未注册，则回退到 `generate_daily_digest_text(...)` 函数封装；
   5. **返回 DailyDigestItem**：
-     - `topic` + `news` + `digest_summary`。
+     - `topic` + `news` + `digest_summary` + `role`。
 
-> 设计理念：分析智能体关注“**如何讲清楚**”，而不是“如何检索”。所有风格与结构逻辑集中在 Prompt + 该 Agent 中，便于独立迭代。
+> 设计理念：分析智能体**关注“如何讲清楚”与角色差异化**，具体 Prompt 与模型调用逻辑下沉到 `shared/skills/intelligence/daily_digest.py` 中的 `GenerateDailyDigestSkill`。
 
 ---
 
@@ -288,3 +288,58 @@ sequenceDiagram
 - **分层约束**：`core_agents` 只向下依赖 `shared` 和 `config`，各服务之间不互相 import；
 - **服务内高内聚**：检索逻辑集中在 `RetrievalAgent`，摘要逻辑集中在 `AnalysisAgent`，Workflow 只负责编排；
 - **Prompt 统一管理**：所有 LLM 行为变化优先通过 `shared/prompts/*.yaml` 管理，而不是在代码里到处写字符串。
+
+---
+
+### 七、联调测试用例与设计思路小结
+
+#### 7.1 最小联调测试用例（模式 B）
+
+- **前置配置**：
+  - 在 `config/service_config.yaml` 中设置：`es_backend: "local_file"`、`vector_backend: "chroma"`；
+  - 准备好 `data/pharma_news.json`，确保至少有若干条与测试主题相关的 mock 资讯。
+- **启动服务**：
+  - `uvicorn core_agents.intelligence_service.api:app --host 0.0.0.0 --port 8001`
+- **调用示例**：
+  - 端点：`POST http://localhost:8001/v1/internal/daily_digest`
+  - 请求体：
+    ```json
+    {
+      "topics": [
+        {
+          "topic_id": "t1",
+          "name": "PD-1 肺癌",
+          "description": "关注 PD-1 相关的肺癌适应症与临床进展",
+          "keywords": ["PD-1", "肺癌", "NSCLC"],
+          "max_items": 5
+        }
+      ],
+      "users": [
+        {
+          "user_id": "u_bd",
+          "email": "bd@example.com",
+          "subscribed_topics": ["t1"],
+          "role": "bd"
+        }
+      ]
+    }
+    ```
+- **预期行为**：
+  - `RetrievalAgent` 通过 Skill `intel.fetch_news`（或回退函数）从 `pharma_news` 中检索相关新闻；
+  - `AnalysisAgent` 通过 Skill `intel.generate_daily_digest` 生成一篇面向 BD 角色的订阅日报文本；
+  - 响应中 `items[0].digest_summary` 为完整日报内容，`items[0].news` 为已筛选的资讯列表。
+
+#### 7.2 设计思路小结
+
+- **分层解耦**：
+  - API + Workflow 层只负责“收什么参数、返回什么结构”；
+  - Agent 层专注情报场景下的检索与聚合套路；
+  - Skill 层封装“具体怎么查、怎么写”的可复用能力；
+  - Prompt / 模型配置全部下沉到 `shared/prompts` 与 `config`，方便统一升级与灰度试验。
+- **模式 B → 模式 C 的平滑演进**：
+  - 在模式 B 中使用 local_file + Chroma 完成需求验证；
+  - 切换到模式 C 时，仅需在 `ESClient` / `VectorStore` / `RAGEngine` 中替换实现，无需改动 `RetrievalAgent`、`AnalysisAgent` 或 Workflow 的对外接口；
+  - 通过这种方式，订阅日报功能可以在笔记本单机上快速试错，又能平滑迁移到生产集群。
+- **与 BD/RD 域的协同**：
+  - intelligence 域的 Skill 设计（`intel.fetch_news` / `intel.generate_daily_digest`）已经在 BD/RD 域以相同模式复制（`bd.lead_qualification` / `rd.compound_analysis`）；
+  - 未来可以在 n8n 编排层，把订阅日报输出作为 BD/RD 流程的输入，实现“情报驱动的 BD 评分”或“情报驱动的化合物优先级排序”。

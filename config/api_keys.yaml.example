@@ -13,7 +13,7 @@ deepseek:
 # Qwen API 配置 (DashScope)
 qwen:
   api_key: "sk-your-qwen-api-key-here"
-  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode"
   model: "qwen-plus"  # qwen-max(最强) | qwen-plus(均衡,推荐) | qwen-flash(最快)
 
 # Gemini API 配置

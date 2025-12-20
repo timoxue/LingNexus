@@ -108,7 +108,68 @@ async def my_workflow(request):
 
 ## 代码生成模式（Code Patterns）
 
-### 1. 新增服务（core_agents/xxx_service/）
+### 1. Skill 层（shared/skills）
+
+**设计目标**：将可复用的“能力”从具体服务中抽离出来，形成可被多个服务、Agent、Workflow 调用的技能库。
+
+- 抽象定义：
+  - `BaseSkill`：所有技能的基类，定义：
+    - `name`：技能唯一标识（如 `intel.fetch_news`、`bd.lead_qualification`、`rd.compound_analysis`）
+    - `domain`：业务域（`intelligence`/`bd`/`rd`）
+    - `category`：技能类别（`retrieval`/`analysis`/`reporting` 等）
+    - `tags`：便于检索和展示的标签列表
+    - `async execute(input_data: SkillInput) -> SkillOutput`
+  - `SkillInput`：所有技能输入模型的基类（Pydantic），具体技能继承并声明字段；
+  - `SkillOutput`：统一输出结构，包含：`success`/`data`/`message`/`meta`。
+- 注册与发现：
+  - 使用 `@register_skill` 装饰器注册技能：
+    - 示例：`@register_skill class FetchNewsSkill(BaseSkill): name = "intel.fetch_news" ...`
+  - 通过 `get_skill(name)` 获取技能实例；`list_skills(domain, category)` 可列出技能。
+- 示例：订阅日报链路中的两个技能：
+  - `intel.fetch_news`（资讯检索技能）：
+    - 输入：`topic_name`、`keywords`、`max_items`
+    - 输出：`data` 为原始资讯 dict 列表（字段结构与 `pharma_news` 索引一致）；
+  - `intel.generate_daily_digest`（日报生成技能）：
+    - 输入：`topic_name`、`topic_description`、`news_items_text`、`role`
+    - 输出：`data` 为生成好的订阅日报文本。
+
+**Agent 调用 Skill 的推荐模式**：
+
+```python
+from shared.skills import get_skill
+from shared.skills.intelligence.fetch_news import FetchNewsInput
+
+skill = get_skill("intel.fetch_news")
+if skill is not None:
+    skill_input = FetchNewsInput(topic_name=topic.name, keywords=keywords, max_items=topic.max_items)
+    skill_output = await skill.execute(skill_input)
+    raw_items = skill_output.data if skill_output.success else []
+else:
+    # 可选：回退到函数封装逻辑
+    from shared.skills.intelligence.fetch_news import fetch_raw_news_for_topic
+    raw_items = await fetch_raw_news_for_topic(topic.name, keywords, topic.max_items)
+```
+
+> 设计原则：业务 Agent 更关注“**用什么能力**”，Skill 层关注“**能力如何实现**”，Shared 层继续屏蔽具体数据源与模型供应商差异。
+
+#### 1.1 三大服务与 Skill 的典型联调用例
+
+- **情报订阅日报（intelligence_service）**：
+  - **接口**：`POST /v1/internal/daily_digest`
+  - **调用链**：`DailyDigestWorkflow` → `RetrievalAgent.fetch_news_for_topic` → Skill `intel.fetch_news` → `AnalysisAgent.build_digest` → Skill `intel.generate_daily_digest` → `llm_manager.chat`。
+  - **设计思路**：Workflow 只负责编排 Topic/User；Agent 专注检索与摘要逻辑；Skill 封装“如何查资讯”“如何写日报”；Prompt 保存在 `shared/prompts/intelligence.yaml`。
+- **BD 线索评估（bd_service）**：
+  - **接口**：`POST /bd/analyze`
+  - **调用链**：`run_bd_pipeline` → Skill `bd.lead_qualification` → `prompt_manager.render(service="bd", key=...)` → `llm_manager.chat`。
+  - **设计思路**：BD Workflow 不直接写 Prompt，只决定“何时需要线索评估”；Skill 使用 BD 域 Prompt（`shared/prompts/bd.yaml`）和指定模型（如 Qwen）生成一段可复用的 BD 报告。
+- **RD 化合物分析（rd_service）**：
+  - **接口**：`POST /rd/analyze`
+  - **调用链**：`run_rd_pipeline` → Skill `rd.compound_analysis` → `prompt_manager.render(service="rd", key=...)` → `llm_manager.chat`。
+  - **设计思路**：RD Workflow 负责“一个化合物需要怎样的分析流程”；Skill 将具体的分析维度（作用机制、安全性、竞品格局等）固化在 Prompt 中，方便后续统一升级。
+
+> 总体设计思路：场景（Workflow）→ 能力编排（Agent）→ 能力实现（Skill）→ 模型与 Prompt（shared/models + shared/prompts），通过 Skill 层把“可复用能力”和“具体场景”解耦，既便于联调测试，也便于在 BD/RD/情报之间迁移能力。
+
+### 2. 新增服务（core_agents/xxx_service/）
 
 **目录结构**：
 ```

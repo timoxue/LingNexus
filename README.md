@@ -41,41 +41,61 @@ LingNexus 是一个面向医药行业的 AI 智能服务平台，旨在通过微
 LingNexus/
 ├── config/                        # 配置中心
 │   ├── settings.py               # 主配置加载器（从 .env + YAML 加载）
+│   ├── agentscope_config.yaml    # AgentScope 配置
 │   ├── api_keys.yaml             # API 密钥配置（不提交到版本控制）
 │   ├── api_keys.yaml.example     # API 密钥配置示例
-│   ├── model_config.yaml         # 大模型配置（API端点、模型名称）
-│   ├── agentscope_config.yaml    # AgentScope 配置
-│   └── service_config.yaml       # 服务端口、数据库连接配置
+│   ├── model_config.yaml         # 大模型配置（API 端点、模型名称）
+│   └── service_config.yaml       # 服务端口、存储后端等配置
 │
 ├── shared/                        # 能力支撑层（所有服务共享）
+│   ├── knowledge/                 # 向量检索与知识管理
+│   │   ├── rag_engine.py         # RAG 引擎（融合 ES + 向量检索）
+│   │   └── vector_store.py       # 向量数据库客户端
+│   ├── models/                    # 大模型统一管理
+│   │   └── llm_manager.py        # 大模型调用、配置解析
+│   ├── prompts/                   # Prompt 统一管理
+│   │   ├── manager.py            # PromptManager 入口
+│   │   ├── intelligence.yaml     # 情报服务 Prompt 集合
+│   │   ├── bd.yaml               # BD 服务 Prompt 集合
+│   │   └── rd.yaml               # RD 服务 Prompt 集合
 │   ├── storage/                   # 统一数据访问层
-│   │   ├── es_client.py          # Elasticsearch 客户端
+│   │   ├── es_client.py          # ES 客户端（支持 local_file / remote_es）
+│   │   ├── es_indices.py         # ES 索引配置
 │   │   ├── es_query_medical.py   # 医药业务查询封装
 │   │   └── rdb_client.py         # 关系型数据库客户端
-│   ├── knowledge/                 # 向量检索与知识管理
-│   │   ├── vector_store.py       # 向量数据库客户端
-│   │   └── rag_engine.py         # RAG 引擎（融合 ES + 向量检索）
-│   ├── models/                    # 大模型统一管理
-│   │   ├── llm_manager.py        # 大模型调用、负载均衡、成本统计
-│   │   └── embed_manager.py      # 嵌入模型管理
 │   ├── tools/                     # 全局工具库
 │   │   ├── data_fetchers.py      # HTTP 数据抓取
 │   │   ├── chemoinformatics.py   # 化学信息学计算
 │   │   └── email_utils.py        # 邮件发送
-│   └── utils/                     # 基础设施工具
-│       ├── logging_utils.py      # 结构化日志
-│       ├── auth.py               # API 鉴权
-│       └── cache_utils.py        # Redis 缓存
+│   ├── utils/                     # 基础设施工具
+│   │   ├── logging_utils.py      # 结构化日志
+│   │   ├── auth.py               # API 鉴权
+│   │   └── cache_utils.py        # 缓存封装
+│   └── __init__.py
 │
 ├── core_agents/                   # 核心业务服务层（微服务）
 │   ├── intelligence_service/      # 情报分析服务
+│   │   ├── agents/               # Agent 定义
+│   │   ├── tools/                # 服务内专用工具
+│   │   ├── workflows/            # 工作流编排（含订阅日报）
 │   │   ├── schema.py             # 请求/响应模型（Pydantic）
 │   │   ├── api.py                # FastAPI 应用入口
-│   │   ├── agents/               # Agent 定义
-│   │   ├── workflows/            # AgentScope 工作流编排
-│   │   └── tools/                # 服务内专用工具
-│   ├── bd_service/               # BD 流程服务（结构同上）
-│   └── rd_service/               # 药物研发服务（结构同上）
+│   │   └── __init__.py
+│   ├── bd_service/               # BD 流程服务
+│   │   ├── agents/
+│   │   ├── tools/
+│   │   ├── workflows/
+│   │   ├── schema.py
+│   │   ├── api.py
+│   │   └── __init__.py
+│   ├── rd_service/               # 药物研发服务
+│   │   ├── agents/
+│   │   ├── tools/
+│   │   ├── workflows/
+│   │   ├── schema.py
+│   │   ├── api.py
+│   │   └── __init__.py
+│   └── __init__.py
 │
 ├── infrastructure/                # 部署与运维
 │   ├── docker/                   # Docker 相关文件
@@ -83,13 +103,18 @@ LingNexus/
 │   │   ├── bd_service.Dockerfile
 │   │   ├── rd_service.Dockerfile
 │   │   └── docker-compose.yml    # 一键启动所有服务
-│   ├── scripts/                  # 运维脚本
-│   │   └── init_es_indices.py    # ES 索引初始化
-│   ├── n8n_webhooks/             # n8n 集成配置示例
-│   └── monitoring/               # 监控配置（Prometheus/Grafana）
+│   └── scripts/                  # 运维/辅助脚本
+│       ├── init_es_indices.py    # ES 索引初始化
+│       └── test_prompt_manager.py# Prompt 管理测试脚本
 │
-├── requirements.txt               # 生产环境依赖
+├── docs/                          # 文档
+│   ├── multi_model_usage_examples.md
+│   └── intelligence_subscription_daily_digest_design.md
+│
 ├── .env.example                  # 环境变量示例
+├── .gitignore
+├── AGENT.md                      # 面向 AI 工具的项目说明
+├── requirements.txt              # 依赖列表
 └── README.md                     # 本文件
 ```
 
@@ -168,7 +193,7 @@ deepseek:
 
 qwen:
   api_key: "sk-your-qwen-key-here"
-  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode"
   model: "qwen-plus"
 ```
 
@@ -337,6 +362,64 @@ curl -X POST "http://localhost:8001/intelligence/analyze" \
 }
 ```
 
+### 7. 联调与测试用例
+
+#### 7.1 情报订阅日报最小联调
+
+- **前置条件**：
+  - 已按模式 B 配置好 `service_config.yaml`，并启动 `intelligence_service`：`uvicorn core_agents.intelligence_service.api:app --host 0.0.0.0 --port 8001`。
+- **请求示例**：
+  - 端点：`POST http://localhost:8001/v1/internal/daily_digest`
+  - 请求体：使用上方示例 JSON（`topics` + `users`，其中 `role` 可为 `bd`/`med`/`market` 等）。
+- **预期结果**：
+  - 返回 `task_id` + 若干 `items`，每个 `item` 中 `digest_summary` 为可直接推送的订阅日报文本，`news` 中包含已去重、排序后的资讯列表。
+
+#### 7.2 BD 线索评估接口联调
+
+- **前置条件**：
+  - 启动 BD 服务：`uvicorn core_agents.bd_service.api:app --host 0.0.0.0 --port 8002`（或你本地正在使用的端口）。
+- **请求示例**：
+  - 端点：`POST http://localhost:8002/bd/analyze`
+  - 请求体：
+    ```json
+    {
+      "target": "XX生物-ADC合作机会",
+      "context": "对方在HER2 ADC领域有III期临床，近期完成一轮C轮融资"
+    }
+    ```
+- **链路说明**：
+  - Workflow `run_bd_pipeline` 会通过 Skill Registry 调用 `bd.lead_qualification`；
+  - Skill 内部使用 `bd.yaml` 中的 Prompt 和 `llm_manager` 调用大模型，返回一段 BD 线索评估总结填充到 `BDResponse.summary` 中。
+
+#### 7.3 RD 化合物分析接口联调
+
+- **前置条件**：
+  - 启动 RD 服务：`uvicorn core_agents.rd_service.api:app --host 0.0.0.0 --port 8003`。
+- **请求示例**：
+  - 端点：`POST http://localhost:8003/rd/analyze`
+  - 请求体：
+    ```json
+    {
+      "compound": "AZD1234",
+      "context": "小分子口服EGFR抑制剂，拟用于晚期NSCLC二线治疗"
+    }
+    ```
+- **链路说明**：
+  - Workflow `run_rd_pipeline` 会调用技能 `rd.compound_analysis`；
+  - Skill 会使用 `rd.yaml` 中的 Prompt + DeepSeek 模型，生成化合物分析文本，返回到 `RDResponse.summary`。
+
+#### 7.4 Prompt 管理测试脚本
+
+- **脚本位置**：`infrastructure/scripts/test_prompt_manager.py`
+- **运行方式**：
+  ```bash
+  cd infrastructure/scripts
+  python test_prompt_manager.py
+  ```
+- **测试内容**：
+  - 自动列出 intelligence / BD / RD 服务下的所有 Prompt；
+  - 验证 `render`、`get_metadata`、错误处理等逻辑是否正常工作。
+
 ---
 
 ## 🔧 开发指南
@@ -427,28 +510,38 @@ touch core_agents/new_service/workflows/{__init__.py,new_workflow.py}
 ### 已完成 ✅
 
 - [x] 搭建微服务框架（情报/BD/RD 三大服务）
-- [x] 配置管理系统（api_keys.yaml + model_config.yaml）
-- [x] 多模型支持（DeepSeek/Qwen/Gemini）
-- [x] Prompt 统一管理系统
+- [x] 配置管理系统（`.env` + `service_config.yaml` + `api_keys.yaml` + `model_config.yaml`）
+- [x] 多模型支持（DeepSeek / Qwen / Gemini），并在 `docs/multi_model_usage_examples.md` 中给出示例
+- [x] Prompt 统一管理系统（`shared/prompts` + `PromptManager` + 测试脚本 `test_prompt_manager.py`）
 - [x] **轻量开发模式（模式 B）**：
-  - local_file ES 后端
+  - `local_file` ES 后端
   - Chroma 本地向量库
-  - 示例数据文件
+  - 示例数据文件（临床试验 + 医药资讯）
+- [x] 情报订阅日报链路（intelligence_service）：
+  - `DailyDigestWorkflow` + `POST /v1/internal/daily_digest`
+  - 订阅业务设计文档：`docs/intelligence_subscription_daily_digest_design.md`
+- [x] Skill 层引入与三域代表性技能：
+  - Intelligence：`intel.fetch_news`、`intel.generate_daily_digest`
+  - BD：`bd.lead_qualification`
+  - RD：`rd.compound_analysis`
+  - 对应 Workflow 已通过 Skill Registry 调用这些技能
+- [x] README / AGENT.md / docs 的首轮对齐更新（目录结构、Skill 架构、联调测试用例）
 
 ### 进行中 🚧
 
-- [ ] 完善 BD 服务与 RD 服务的业务逻辑
-- [ ] 添加单元测试与集成测试
+- [ ] 持续丰富 BD 服务与 RD 服务的业务逻辑（在现有 Skill 基础上扩展更多场景）
+- [ ] 梳理并补充自动化测试（单元测试 + 集成测试），规划统一的 `tests/` 结构
 
 ### 计划中 📋
 
 - [ ] **生产模式（模式 C）支持**：
   - 接入真实 Elasticsearch 服务
   - 接入 Milvus 向量数据库
-  - Docker Compose 部署配置
+  - Docker Compose 部署配置完善
 - [ ] 接入 Prometheus + Grafana 监控
-- [ ] 完善 n8n webhook 配置示例
-- [ ] 添加 Redis 缓存层
+- [ ] 在文档中增加“跨域 Skill 能力地图”（列出现有 `intel.*` / `bd.*` / `rd.*` 技能及适用场景）
+- [ ] 完善 n8n webhook 配置示例（围绕订阅日报 + BD/RD 流程编排）
+- [ ] 添加 Redis 缓存层（`shared/utils/cache_utils.py` 与实际 Redis 部署联通）
 
 ---
 

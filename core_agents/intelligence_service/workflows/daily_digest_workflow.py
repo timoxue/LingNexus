@@ -33,14 +33,6 @@ async def run_daily_digest(request: DailyDigestRequest) -> DailyDigestResponse:
 
     items: List[DailyDigestItem] = []
 
-    # 统计本次请求中出现的用户角色，用于个性化摘要
-    roles: List[str | None] = []
-    role_set = {user.role for user in users if user.role}
-    if role_set:
-        roles = sorted(role_set)
-    else:
-        roles = [None]
-
     for topic in topics:
         logger.info(
             "DailyDigest processing topic",
@@ -50,10 +42,9 @@ async def run_daily_digest(request: DailyDigestRequest) -> DailyDigestResponse:
         # 1. 检索资讯
         news_list = await retrieval_agent.fetch_news_for_topic(topic)
 
-        # 2. 针对不同角色生成订阅日报（最简单做法：每个角色一份摘要）
-        for role in roles:
-            digest_item = await analysis_agent.build_digest(topic, news_list, users=users, role=role)
-            items.append(digest_item)
+        # 2. 构建订阅日报
+        digest_item = await analysis_agent.build_digest(topic, news_list, users=users)
+        items.append(digest_item)
 
     task_id = f"daily_{uuid4()}"
     logger.info(

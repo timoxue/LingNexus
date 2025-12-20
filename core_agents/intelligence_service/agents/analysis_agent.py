@@ -1,8 +1,8 @@
 from typing import List
 
 from core_agents.intelligence_service.schema import DailyDigestItem, NewsItem, TopicConfig, UserConfig
-from shared.models.llm_manager import llm_manager
-from shared.prompts.manager import prompt_manager
+from shared.skills import get_skill
+from shared.skills.intelligence.daily_digest import DailyDigestInput
 from shared.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -54,34 +54,36 @@ class AnalysisAgent:
 
         news_items_str = "\n\n".join(news_items_str_parts)
 
-        # 4. 渲染订阅日报 Prompt
-        prompt_key = "intelligence_daily_digest_v1"
-        prompt_text = prompt_manager.render(
-            service="intelligence",
-            key=prompt_key,
-            topic_name=topic.name,
-            topic_description=topic.description or "",
-            news_items=news_items_str,
-            target_role=role or "综合读者",
-        )
+        # 4. 优先通过技能中心调用订阅日报生成技能
+        skill = get_skill("intel.generate_daily_digest")
+        if skill is not None:
+            skill_input = DailyDigestInput(
+                topic_name=topic.name,
+                topic_description=topic.description or "",
+                news_items_text=news_items_str,
+                role=role,
+            )
+            skill_output = await skill.execute(skill_input)
+            digest_summary = skill_output.data if skill_output.success else ""
+        else:
+            # 回退到函数封装，保证在技能未注册时仍可工作
+            from shared.skills.intelligence.daily_digest import generate_daily_digest_text
 
-        recommended_model = prompt_manager.get_recommended_model("intelligence", prompt_key)
+            digest_summary = await generate_daily_digest_text(
+                topic_name=topic.name,
+                topic_description=topic.description or "",
+                news_items_text=news_items_str,
+                role=role,
+            )
 
         logger.info(
             "AnalysisAgent generating digest",
             extra={
                 "topic": topic.name,
                 "news_count": len(limited_news),
-                "model": recommended_model,
+                "role": role or "综合读者",
             },
         )
-
-        messages = [
-            {"role": "system", "content": prompt_text},
-            {"role": "user", "content": "请根据上述要求生成适合推送的订阅日报。"},
-        ]
-
-        digest_summary = await llm_manager.chat(messages, model_name=recommended_model)
 
         return DailyDigestItem(topic=topic, news=limited_news, digest_summary=digest_summary, role=role)
 

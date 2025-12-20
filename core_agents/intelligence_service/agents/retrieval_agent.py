@@ -1,8 +1,8 @@
 from typing import List
 
 from core_agents.intelligence_service.schema import NewsItem, TopicConfig
-from shared.storage import es_client
-from shared.storage.es_query_medical import query_news_by_topic
+from shared.skills import get_skill
+from shared.skills.intelligence.fetch_news import FetchNewsInput
 from shared.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -24,12 +24,25 @@ class RetrievalAgent:
             extra={"topic": topic.name, "keywords": keywords, "max_items": topic.max_items},
         )
 
-        raw_items = await query_news_by_topic(
-            es_client=es_client,
-            topic=topic.name,
-            keywords=keywords,
-            top_k=topic.max_items,
-        )
+        # 优先通过技能中心调用检索技能，保持与 Skill 框架一致
+        skill = get_skill("intel.fetch_news")
+        if skill is not None:
+            skill_input = FetchNewsInput(
+                topic_name=topic.name,
+                keywords=keywords,
+                max_items=topic.max_items,
+            )
+            skill_output = await skill.execute(skill_input)
+            raw_items = skill_output.data if skill_output.success else []
+        else:
+            # 回退到函数封装，保证在技能未注册时仍可工作
+            from shared.skills.intelligence.fetch_news import fetch_raw_news_for_topic
+
+            raw_items = await fetch_raw_news_for_topic(
+                topic_name=topic.name,
+                keywords=keywords,
+                max_items=topic.max_items,
+            )
 
         news_list: List[NewsItem] = []
         for item in raw_items:
