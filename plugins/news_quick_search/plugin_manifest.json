@@ -1,0 +1,72 @@
+{
+  "plugin_id": "com.lingnexus.intel.news-quick-search",
+  "version": "1.0.0",
+  "name": "新闻快速搜索",
+  "description": "根据关键词快速检索医药新闻资讯，支持多关键词组合搜索",
+  "author": "LingNexus Team",
+  "icon": "🔍",
+  "category": "intelligence",
+  "tags": ["搜索", "新闻", "资讯", "检索"],
+
+  "required_skills": [
+    "intel.fetch_news"
+  ],
+
+  "entrypoint": "plugins.news_quick_search.main:run_plugin",
+
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "topic_name": {
+        "type": "string",
+        "description": "搜索主题名称，例如：PD-1、CAR-T、ADC等",
+        "examples": ["PD-1 肺癌", "CAR-T 治疗", "ADC 药物"]
+      },
+      "keywords": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "搜索关键词列表（可选），用于精准匹配",
+        "examples": [["PD-1", "NSCLC", "免疫治疗"], ["CAR-T", "淋巴瘤"]]
+      },
+      "max_items": {
+        "type": "number",
+        "default": 10,
+        "description": "返回的最大新闻数量，默认10条",
+        "examples": [5, 10, 20]
+      }
+    },
+    "required": ["topic_name"]
+  },
+
+  "output_schema": {
+    "status": {
+      "type": "string",
+      "description": "执行状态：success 或 error"
+    },
+    "news_count": {
+      "type": "number",
+      "description": "检索到的新闻数量"
+    },
+    "news_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "title": {"type": "string"},
+          "summary": {"type": "string"},
+          "source": {"type": "string"},
+          "published_at": {"type": "string"},
+          "url": {"type": "string"}
+        }
+      },
+      "description": "新闻列表"
+    }
+  },
+
+  "permissions": [
+    "read_pharma_news"
+  ]
+}

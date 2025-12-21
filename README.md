@@ -16,6 +16,11 @@ LingNexus 是一个面向医药行业的 AI 智能服务平台，旨在通过微
 ### 核心特性
 
 - ✅ **服务化架构**：每个业务场景独立部署，可单独扩展
+- ✅ **Skill 能力层**：底层原子能力，通过 `@register_skill` 注册，跨服务复用
+- ✅ **Plugin 生态**：
+  - 插件封装 Skill，面向终端用户
+  - Plugin Store Web UI 提供可视化管理
+  - 自动表单生成，零代码运行
 - ✅ **统一配置管理**：环境变量 + YAML 配置，敏感信息安全隔离
 - ✅ **能力层复用**：共享大模型、知识库、数据访问等核心能力
 - ✅ **可编排接口**：通过 FastAPI 暴露标准 HTTP 端点，支持 n8n 等工具编排
@@ -58,6 +63,16 @@ LingNexus/
 │   │   ├── intelligence.yaml     # 情报服务 Prompt 集合
 │   │   ├── bd.yaml               # BD 服务 Prompt 集合
 │   │   └── rd.yaml               # RD 服务 Prompt 集合
+│   ├── skills/                    # Skill 能力层（跨服务复用）
+│   │   ├── intelligence/          # 情报领域 Skill
+│   │   │   ├── fetch_news.py     # 新闻检索
+│   │   │   └── generate_daily_digest.py  # 日报生成
+│   │   ├── bd/                   # BD 领域 Skill
+│   │   │   └── lead_qualification.py
+│   │   ├── rd/                   # RD 领域 Skill
+│   │   │   └── compound_analysis.py
+│   │   ├── registry.py           # Skill 注册表
+│   │   └── plugin.py             # 插件开发工具
 │   ├── storage/                   # 统一数据访问层
 │   │   ├── es_client.py          # ES 客户端（支持 local_file / remote_es）
 │   │   ├── es_indices.py         # ES 索引配置
@@ -97,6 +112,34 @@ LingNexus/
 │   │   └── __init__.py
 │   └── __init__.py
 │
+├── plugin_runtime/                # 插件运行时服务
+│   ├── server.py                 # FastAPI 服务（端口 8015）
+│   ├── manager.py                # 插件管理器
+│   ├── plugin_loader.py          # 自动发现插件
+│   └── models.py                 # 数据模型
+│
+├── plugins/                       # 插件安装目录
+│   ├── intel_daily_digest/       # 订阅日报插件
+│   │   ├── plugin_manifest.json  # 插件元信息
+│   │   ├── main.py               # 入口函数
+│   │   └── __init__.py
+│   └── news_quick_search/        # 新闻检索插件
+│       ├── plugin_manifest.json
+│       ├── main.py
+│       └── __init__.py
+│
+├── plugin_store/                  # 插件商店
+│   ├── backend/                   # BFF 层（端口 8020）
+│   │   └── api.py
+│   └── frontend/                  # Web UI（端口 5173）
+│       ├── src/
+│       │   ├── pages/
+│       │   │   ├── PluginList.tsx
+│       │   │   └── PluginDetail.tsx
+│       │   └── api/
+│       │       └── plugins.ts
+│       └── vite.config.ts
+│
 ├── infrastructure/                # 部署与运维
 │   ├── docker/                   # Docker 相关文件
 │   │   ├── intelligence_service.Dockerfile
@@ -109,7 +152,10 @@ LingNexus/
 │
 ├── docs/                          # 文档
 │   ├── multi_model_usage_examples.md
-│   └── intelligence_subscription_daily_digest_design.md
+│   ├── intelligence_subscription_daily_digest_design.md
+│   ├── skill_capability_map_v0.1.md
+│   ├── plugin_runtime_and_daily_digest_plugin_design.md
+│   └── skill_to_plugin_architecture.md  # Skill → Plugin → Plugin Store 架构设计
 │
 ├── .env.example                  # 环境变量示例
 ├── .gitignore
@@ -526,6 +572,13 @@ touch core_agents/new_service/workflows/{__init__.py,new_workflow.py}
   - RD：`rd.compound_analysis`
   - 对应 Workflow 已通过 Skill Registry 调用这些技能
 - [x] README / AGENT.md / docs 的首轮对齐更新（目录结构、Skill 架构、联调测试用例）
+- [x] 插件运行时 MVP + 首个订阅日报插件（`plugin_runtime/` + `plugins/intel_daily_digest`），并在 docs 中补充设计说明
+- [x] **Plugin 生态完善**：
+  - Plugin Store 前后端（React + FastAPI）
+  - 插件自动发现机制（扫描 `plugins/` 目录）
+  - 基于 JSON Schema 自动生成表单
+  - Skill → Plugin 转换流程与最佳实践
+  - 完整架构文档：`docs/skill_to_plugin_architecture.md`
 
 ### 进行中 🚧
 

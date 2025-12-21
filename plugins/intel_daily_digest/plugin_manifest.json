@@ -1,0 +1,94 @@
+{
+  "plugin_id": "com.lingnexus.intel.daily-digest",
+  "version": "1.0.0",
+  "name": "订阅日报 Quick Run",
+  "description": "根据用户选择的主题和角色，一键生成情报订阅日报草稿。",
+  "author": "LingNexus Team",
+  "icon": "📰",
+  "category": "intelligence",
+  "tags": ["订阅", "日报", "情报", "RAG"],
+
+  "required_skills": [
+    "intel.fetch_news",
+    "intel.generate_daily_digest"
+  ],
+
+  "entrypoint": "plugins.intel_daily_digest.main:run_plugin",
+
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "topics": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "topic_id": {"type": "string"},
+            "name": {"type": "string", "description": "订阅主题名称，如 PD-1 肺癌"},
+            "description": {"type": "string"},
+            "keywords": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "用于检索的关键词列表"
+            },
+            "max_items": {"type": "number", "default": 5}
+          },
+          "required": ["name"]
+        },
+        "description": "订阅主题列表"
+      },
+      "role": {
+        "type": "string",
+        "enum": ["bd", "med", "market", "rd", "general"],
+        "description": "主要阅读角色"
+      },
+      "lang": {
+        "type": "string",
+        "default": "zh-CN",
+        "description": "输出语言（预留）"
+      }
+    },
+    "required": ["topics", "role"]
+  },
+
+  "output_schema": {
+    "task_id": {"type": "string", "description": "内部任务 ID"},
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "object",
+            "properties": {
+              "topic_id": {"type": "string"},
+              "name": {"type": "string"},
+              "max_items": {"type": "number"}
+            }
+          },
+          "news": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {"type": "string"},
+                "title": {"type": "string"},
+                "summary": {"type": "string"},
+                "source": {"type": "string"},
+                "published_at": {"type": "string"},
+                "url": {"type": "string"}
+              }
+            }
+          },
+          "digest_summary": {"type": "string", "description": "可直接推送的日报文本"},
+          "role": {"type": "string"}
+        }
+      }
+    }
+  },
+
+  "permissions": [
+    "read_pharma_news",
+    "call_llm_standard"
+  ]
+}

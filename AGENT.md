@@ -169,7 +169,32 @@ else:
 
 > 总体设计思路：场景（Workflow）→ 能力编排（Agent）→ 能力实现（Skill）→ 模型与 Prompt（shared/models + shared/prompts），通过 Skill 层把“可复用能力”和“具体场景”解耦，既便于联调测试，也便于在 BD/RD/情报之间迁移能力。
 
-### 2. 新增服务（core_agents/xxx_service/）
+### 2. 插件运行时（plugin_runtime/ + plugins/）
+
+**设计目标**：在不破坏现有分层架构的前提下，引入一层“插件运行时”，将多个 Skill/Workflow 封装为可安装、可调用的插件（Plugin），便于 Web 操作台、IM 机器人等统一调用。
+
+- 目录结构：
+  - `plugin_runtime/`
+    - `api.py`：Plugin Runtime 的 FastAPI 应用入口，提供：
+      - `GET /plugins`：列出可用插件；
+      - `GET /plugins/{plugin_id}/schema`：返回插件的 `input_schema` / `output_schema`；
+      - `POST /plugins/{plugin_id}/invoke`：执行插件入口；
+    - `models.py`：`PluginManifest` / `PluginSummary` / `PluginInvokeResponse` 等运行时模型；
+    - `registry.py`：从 `plugins/` 目录加载 `plugin_manifest.json`，导入入口函数并注册到内存。
+  - `plugins/`
+    - `intel_daily_digest/`：首个 PoC 插件“订阅日报 Quick Run”：
+      - `plugin_manifest.json`：插件元信息、依赖 `required_skills`、输入输出 Schema；
+      - `main.py`：约定入口 `async def run_plugin(input_data: dict, context: dict | None) -> dict`。
+
+- 推荐使用方式（面向外部系统 / 工具）：
+  - 优先通过 Plugin Runtime 的 `/plugins/...` 接口调用插件，而不是直接调用某个服务的内部接口；
+  - 插件内部再调用对应的 Workflow/Skill，例如：
+    - 订阅日报插件：内部调用 `DailyDigestWorkflow.run_daily_digest`（间接使用 `intel.fetch_news` + `intel.generate_daily_digest`）；
+    - 未来的 BD/RD 插件可以复用 `bd.lead_qualification`、`rd.compound_analysis` 等 Skill。
+
+> 对 AI 编程助手而言：如果用户希望“像 App 一样使用 AI 能力”，优先考虑通过 Plugin Runtime 调用插件；如果是针对具体服务做底层改造，则继续直接操作 `core_agents/` 与 `shared/skills/`。
+
+### 3. 新增服务（core_agents/xxx_service/）
 
 **目录结构**：
 ```
@@ -654,3 +679,301 @@ python infrastructure/scripts/init_es_indices.py
 - **易扩展**：新增服务只需复制结构模板，填充业务逻辑
 
 AI 编程助手在生成代码时，请务必遵守上述架构约束和代码模式，确保生成的代码与项目整体保持一致。
+
+---
+
+## Plugin 生态架构（重要补充）
+
+### 概述
+
+项目现已实现**三层插件化架构**：
+
+```
+Skill (能力层) → Plugin (插件层) → Plugin Store (用户层)
+```
+
+**设计目标**：
+- Skill：底层原子能力，供开发者/Agent 使用
+- Plugin：封装 Skill 为业务场景，面向终端用户
+- Plugin Store：提供 Web UI，让用户零代码运行插件
+
+### 目录结构
+
+```
+LingNexus/
+├── plugin_store/                  # 插件商店
+│   ├── backend/                   # BFF 层 (FastAPI, :8020)
+│   │   └── api.py                 # 透传 Plugin Runtime API
+│   └── frontend/                  # Web UI (React + Vite, :5173)
+│       ├── src/pages/
+│       │   ├── PluginList.tsx     # 插件列表
+│       │   └── PluginDetail.tsx   # 插件详情 + 表单
+│       └── vite.config.ts         # Vite 配置 (/api 代理到 8020)
+│
+├── plugin_runtime/                # 插件运行时 (FastAPI, :8015)
+│   ├── server.py                 # FastAPI 应用入口
+│   ├── manager.py                # 插件管理器
+│   ├── plugin_loader.py          # 自动发现 plugins/
+│   └── models.py                 # PluginManifest/Detail/StoreItem
+│
+└── plugins/                       # 插件安装目录
+    ├── intel_daily_digest/
+    │   ├── plugin_manifest.json  # 元信息 + input/output schema
+    │   ├── main.py               # 入口函数 run_plugin()
+    │   └── __init__.py
+    └── news_quick_search/
+        ├── plugin_manifest.json
+        ├── main.py
+        └── __init__.py
+```
+
+### 数据流向
+
+```
+用户在浏览器填写表单
+    ↓
+Plugin Store Frontend (5173)
+    ↓ /api/plugins/{id}/run
+Plugin Store Backend (8020)
+    ↓ HTTP 请求
+Plugin Runtime (8015)
+    ↓ 加载并执行
+plugins/ 目录中的插件
+    ↓ get_skill()
+调用底层 Skill
+    ↓
+返回结果 → 用户
+```
+
+### Plugin 开发模式
+
+#### 1. 插件元信息 (plugin_manifest.json)
+
+**关键字段**：
+```json
+{
+  "plugin_id": "com.lingnexus.intel.news-quick-search",
+  "version": "1.0.0",
+  "name": "新闻快速搜索",
+  "description": "插件简介",
+  
+  "required_skills": ["intel.fetch_news"],  // 声明依赖的 Skill
+  "entrypoint": "plugins.news_quick_search.main:run_plugin",
+  
+  "input_schema": {
+    "type": "object",          // 必须！符合 JSON Schema 标准
+    "properties": {
+      "topic_name": {
+        "type": "string",
+        "description": "搜索主题"
+      }
+    },
+    "required": ["topic_name"]
+  },
+  
+  "permissions": ["read_pharma_news"]
+}
+```
+
+**关键约束**：
+- ✅ `input_schema` **必须**有 `type: "object"` 和 `properties` 包装
+- ✅ `required` 在顶层，而不是每个属性内
+- ✅ `entrypoint` 使用 Python 导入路径（`模块:函数`）
+
+#### 2. 插件入口函数 (main.py)
+
+**模式 1：使用 @plugin_entrypoint 装饰器（推荐）**：
+```python
+from shared.skills.plugin import plugin_entrypoint
+from shared.skills.registry import get_skill
+from shared.skills.intelligence.fetch_news import FetchNewsInput
+
+@plugin_entrypoint
+async def run_plugin(payload: Dict[str, Any], context: Optional[Dict[str, Any]] = None):
+    # 1. 提取参数
+    topic_name = payload.get("topic_name")
+    keywords = payload.get("keywords", [])
+    
+    # 2. 获取 Skill（关键！）
+    skill = get_skill("intel.fetch_news")
+    if not skill:
+        return {"status": "error", "error": "Skill 不可用"}
+    
+    # 3. 调用 Skill
+    skill_output = await skill.execute(FetchNewsInput(
+        topic_name=topic_name,
+        keywords=keywords
+    ))
+    
+    # 4. 返回用户友好格式
+    return {
+        "status": "success",
+        "news_count": len(skill_output.data),
+        "news_items": skill_output.data
+    }
+```
+
+**模式 2：继承 BasePlugin 类**：
+```python
+from shared.skills.plugin import BasePlugin
+
+class MyPlugin(BasePlugin):
+    async def execute(self, payload, context):
+        # 插件逻辑
+        return {"status": "success"}
+
+run_plugin = MyPlugin()
+```
+
+**关键设计原则**：
+- ❗ **禁止在插件中重复实现业务逻辑**
+- ✅ **必须通过 `get_skill()` 调用底层 Skill**
+- ✅ 插件只负责：参数转换 + 结果格式化
+
+#### 3. 自动发现机制
+
+Plugin Runtime 启动时：
+1. 扫描 `plugins/` 目录的所有 `plugin_manifest.json`
+2. 验证 manifest 合法性
+3. 动态导入 `entrypoint` 指定的函数
+4. 注册到内存管理器
+
+**关键代码**：
+```python
+# plugin_runtime/plugin_loader.py
+def discover_manifests() -> List[PluginManifest]:
+    plugins_dir = Path(__file__).parent.parent / "plugins"
+    manifests = []
+    for manifest_path in plugins_dir.rglob("plugin_manifest.json"):
+        with manifest_path.open("r", encoding="utf-8") as f:
+            manifest = PluginManifest(**json.load(f))
+            manifests.append(manifest)
+    return manifests
+```
+
+### Plugin Store 前端特性
+
+#### 1. 自动表单生成
+
+基于 `input_schema` 自动生成输入表单：
+- `type: "string"` → 文本输入框
+- `type: "number"` → 数字输入框
+- `type: "array"` → 多行文本框（每行一个值）
+- `type: "string", enum: [...]` → 下拉选择框
+- `required: [...]` → 必填标识（*）
+
+**关键代码**：
+```typescript
+// plugin_store/frontend/src/pages/PluginDetail.tsx
+const renderInputField = (key: string, schema: any) => {
+  if (schema.type === 'string' && schema.enum) {
+    return <select>...</select>;
+  }
+  if (schema.type === 'array') {
+    return <textarea placeholder="每行一个值">...</textarea>;
+  }
+  return <input type="text" />;
+};
+```
+
+#### 2. 插件运行流程
+
+1. 用户在详情页填写表单
+2. 点击“运行插件”
+3. 前端收集表单数据，构造 `payload`
+4. 调用 `/api/plugins/{id}/run` (8020)
+5. Backend 透传到 `/plugins/{id}/invoke` (8015)
+6. Runtime 加载插件并执行
+7. 返回结果展示给用户
+
+### API 端点
+
+#### Plugin Runtime (8015)
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/store/plugins` | GET | 获取所有插件列表 |
+| `/plugins/{id}/detail` | GET | 获取插件详情 |
+| `/plugins/{id}/invoke` | POST | 执行插件 |
+| `/store/plugins/{id}/enable` | POST | 启用插件 |
+| `/store/plugins/{id}/disable` | POST | 禁用插件 |
+
+#### Plugin Store Backend (8020)
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/plugins` | GET | 透传 Runtime 插件列表 |
+| `/api/plugins/{id}` | GET | 透传 Runtime 插件详情 |
+| `/api/plugins/{id}/run` | POST | 透传 Runtime 执行请求 |
+
+### Skill → Plugin 转换流程
+
+**场景**：将现有 Skill `intel.fetch_news` 转为插件
+
+```bash
+# 1. 确认 Skill 已注册
+from shared.skills.registry import get_skill
+get_skill("intel.fetch_news")  # 返回 Skill 实例
+
+# 2. 创建插件目录
+mkdir -p plugins/news_quick_search
+
+# 3. 编写 plugin_manifest.json
+# - 在 required_skills 中声明 "intel.fetch_news"
+# - 定义 input_schema（符合 JSON Schema 标准）
+# - 设置 entrypoint
+
+# 4. 编写 main.py
+# - 使用 @plugin_entrypoint 装饰器
+# - 通过 get_skill("intel.fetch_news") 获取 Skill
+# - 调用 skill.execute()
+# - 返回用户友好格式
+
+# 5. 创建 __init__.py
+touch plugins/news_quick_search/__init__.py
+
+# 6. 重启 Plugin Runtime
+python -m uvicorn plugin_runtime.server:app --port 8015
+
+# 7. 验证插件已上架
+curl http://localhost:8015/store/plugins
+```
+
+### 服务启动顺序
+
+```bash
+# 1️⃣ 启动 Plugin Runtime（必需）
+conda activate lingnexus
+python -m uvicorn plugin_runtime.server:app --host 0.0.0.0 --port 8015
+
+# 2️⃣ 启动 Plugin Store Backend（必需）
+python -m uvicorn plugin_store.backend.api:app --host 0.0.0.0 --port 8020
+
+# 3️⃣ 启动 Plugin Store Frontend（开发模式）
+cd plugin_store/frontend
+npm run dev
+```
+
+访问：http://localhost:5173
+
+### AI 编程助手注意事项
+
+1. **开发插件时**：
+   - ✅ 必须使用 `@plugin_entrypoint` 装饰器
+   - ✅ 必须通过 `get_skill()` 调用底层 Skill
+   - ❗ 禁止在插件中重复实现逻辑
+   - ✅ `input_schema` 必须符合 JSON Schema 标准
+
+2. **修改 manifest 时**：
+   - ✅ 确保 `type: "object"` 和 `properties` 存在
+   - ✅ `required` 在顶层，而不是各属性内
+   - ✅ `entrypoint` 使用正确的 Python 路径
+
+3. **调试时**：
+   - 查看 Plugin Runtime 日志：`tail -f logs/plugin_runtime.log`
+   - 测试 API：`curl http://localhost:8015/store/plugins`
+   - 检查 Skill 是否注册：`get_skill("skill_name")`
+
+### 完整文档
+
+**详细架构设计请参考**：`docs/skill_to_plugin_architecture.md`
