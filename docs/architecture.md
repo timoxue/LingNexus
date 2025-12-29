@@ -54,7 +54,8 @@ agent_factory.py (工厂实现)
 - **职责**：提供 Agent 创建的便捷函数
 - **定位**：统一入口，面向用户
 - **函数**：
-  - `create_docx_agent()` - 创建 docx Agent
+  - `create_docx_agent()` - 创建 docx Agent（传统方式）
+  - `create_progressive_agent()` - 创建支持渐进式披露的 Agent（推荐）
   - （未来可以添加更多：`create_pdf_agent()`, `create_multi_skill_agent()` 等）
 
 #### `lingnexus/agent/agent_factory.py`
@@ -70,19 +71,19 @@ agent_factory.py (工厂实现)
 
 ## Skill 集成方式
 
-### 通过系统提示词（当前实现）
+### 方式 1: 传统方式（一次性加载）
 
 1. 注册 Skill 到 Toolkit
 2. 获取技能提示词
 3. 将提示词添加到系统提示词
 4. Agent 根据提示词生成代码
 
-### 工作流程
+**工作流程**：
 
 ```
 用户请求
     ↓
-ReActAgent 接收
+ReActAgent 接收（已包含所有 Skills 的完整指令）
     ↓
 分析需求 → 识别需要使用的 Skill
     ↓
@@ -93,15 +94,103 @@ ReActAgent 接收
 返回结果给用户
 ```
 
+### 方式 2: 渐进式披露（推荐）
+
+实现 Claude Skills 的渐进式披露机制：
+
+1. **阶段1**：初始化时只加载所有 Skills 的元数据（~100 tokens/Skill）
+2. **阶段2**：LLM 判断需要时，动态加载完整指令（~5k tokens）
+3. **阶段3**：按需访问资源文件（scripts/, references/, assets/）
+
+**工作流程**：
+
+```
+用户请求
+    ↓
+ReActAgent 接收（只包含 Skills 的元数据）
+    ↓
+LLM 调用 #1：分析需求 → 判断需要哪个 Skill（基于元数据）
+    ↓
+调用 load_skill_instructions 工具
+    ↓
+动态加载选定 Skill 的完整指令
+    ↓
+LLM 调用 #2：根据完整指令规划如何使用 Skill
+    ↓
+生成代码并执行
+    ↓
+返回结果给用户
+```
+
+**关键点**：
+- LLM 调用发生在使用 Skill 之前
+- 第一次调用：判断是否需要使用 Skill（基于元数据）
+- 第二次调用：规划如何使用 Skill（基于完整指令）
+- Skill 脚本的执行在 LLM 调用之后
+
+**架构组件**：
+
+```
+┌─────────────────────────────────────────┐
+│    Progressive Agent (qwen-max)        │
+│    - 看到所有 Skills 的元数据            │
+│    - 智能选择需要的 Skill                │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│    渐进式加载工具                         │
+│    - load_skill_instructions()          │
+│    - list_available_skills()            │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│    SkillLoader                          │
+│    - 元数据缓存                          │
+│    - 完整指令缓存                         │
+│    - 动态加载方法                         │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│    Skills 目录                           │
+│    - external/ (Claude Skills)          │
+│    - internal/ (自定义 Skills)           │
+└─────────────────────────────────────────┘
+```
+
 ## 调用示例
 
 ### ✅ 正确方式（通过 react_agent.py）
 
+**传统方式**：
+
 ```python
-# CLI 工具
 from lingnexus.agent import create_docx_agent
+from lingnexus.config import ModelType
 
 agent = create_docx_agent(model_type=ModelType.QWEN)
+```
+
+**渐进式披露方式（推荐）**：
+
+```python
+from lingnexus.agent import create_progressive_agent
+import asyncio
+from agentscope.message import Msg
+
+agent = create_progressive_agent(
+    model_name="qwen-max",
+    temperature=0.3,
+)
+
+async def main():
+    user_msg = Msg(name="user", role="user", content="创建一个 Word 文档")
+    response = await agent(user_msg)
+    print(response.content)
+
+asyncio.run(main())
 ```
 
 ### ❌ 错误方式（直接调用 AgentFactory）
@@ -160,8 +249,11 @@ multi_agent = create_multi_skill_agent(
 ## 当前实现状态
 
 - ✅ `interactive.py` 已通过 `react_agent.py` 调用
-- ✅ `react_agent.py` 提供 `create_docx_agent()` 函数
+- ✅ `react_agent.py` 提供 `create_docx_agent()` 函数（传统方式）
+- ✅ `react_agent.py` 提供 `create_progressive_agent()` 函数（渐进式披露）
 - ✅ `agent_factory.py` 提供底层实现
+- ✅ `SkillLoader` 支持渐进式披露方法
+- ✅ `progressive_skill_loader.py` 提供动态加载工具
 - ✅ 架构清晰，符合设计原则
 
 ## 相关文档

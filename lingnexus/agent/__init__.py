@@ -4,7 +4,7 @@ Agent 模块
 """
 
 from .agent_factory import AgentFactory
-from .react_agent import create_docx_agent
+from .react_agent import create_docx_agent, create_progressive_agent
 
-__all__ = ["AgentFactory", "create_docx_agent"]
+__all__ = ["AgentFactory", "create_docx_agent", "create_progressive_agent"]
 

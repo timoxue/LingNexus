@@ -36,6 +36,7 @@ LingNexus/
 - ✅ 基础 docx Agent 示例 - 演示如何使用 docx 技能
 - ✅ 模型配置模块 - 支持 Qwen 和 DeepSeek 模型
 - ✅ 交互式测试工具 - 用户友好的命令行界面
+- ✅ **渐进式披露机制** - 实现 Claude Skills 的渐进式加载（使用 qwen-max 作为 orchestrator）
 
 ### 快速使用示例
 
@@ -70,6 +71,8 @@ uv run python examples/interactive_test.py
 
 **3. 编程方式使用**
 
+**传统方式（一次性加载所有 Skills）**：
+
 ```python
 from lingnexus.agent import create_docx_agent
 from lingnexus.config import ModelType
@@ -92,7 +95,42 @@ async def main():
 asyncio.run(main())
 ```
 
-更多示例请查看 `examples/docx_agent_example.py`
+**渐进式披露方式（推荐，Token 效率更高）**：
+
+```python
+from lingnexus.agent import create_progressive_agent
+from lingnexus.config import init_agentscope
+import asyncio
+from agentscope.message import Msg
+
+# 初始化 AgentScope
+init_agentscope()
+
+# 创建支持渐进式披露的 Agent（使用 qwen-max 作为 orchestrator）
+agent = create_progressive_agent(
+    model_name="qwen-max",
+    temperature=0.3,  # orchestrator 使用较低温度
+)
+
+# 使用 Agent（会自动按需加载 Skills 的完整指令）
+async def main():
+    user_msg = Msg(name="user", role="user", content="请创建一个 Word 文档")
+    # Agent 会自动判断需要 docx 技能，并动态加载其完整指令
+    response = await agent(user_msg)
+    print(response.content)
+
+asyncio.run(main())
+```
+
+**渐进式披露的优势**：
+- ✅ Token 效率高：初始只加载 Skills 的元数据（~100 tokens/Skill）
+- ✅ 智能按需加载：只在需要时加载完整指令（~5k tokens）
+- ✅ 可扩展性强：支持大量 Skills，不会 token 爆炸
+- ✅ 符合 Claude Skills 设计理念
+
+更多示例请查看：
+- `examples/docx_agent_example.py` - 传统方式示例
+- `examples/progressive_agent_example.py` - 渐进式披露示例
 
 **API Key 管理说明**：详见 [API Key 管理指南](docs/api_key_guide.md)
 

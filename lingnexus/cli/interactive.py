@@ -16,7 +16,7 @@ if sys.platform == 'win32':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 from ..config import init_agentscope, ModelType
-from ..agent import create_docx_agent  # 通过 react_agent.py 作为统一入口
+from ..agent import create_progressive_agent  # 通过 react_agent.py 作为统一入口，使用渐进式披露
 from ..utils.code_executor import extract_and_execute_code
 from agentscope.message import Msg
 
@@ -64,14 +64,19 @@ class InteractiveTester:
         )
     
     def _create_agent(self):
-        """创建 Agent"""
+        """创建 Agent（使用渐进式披露方式）"""
         if self.agent is None:
-            print("正在创建 Agent...")
-            self.agent = create_docx_agent(
-                model_type=self.model_type,
-                model_name=self.model_name,
+            print("正在创建 Agent（渐进式披露模式）...")
+            # 使用渐进式披露 Agent，推荐使用 qwen-max 作为 orchestrator
+            # 渐进式披露模式统一使用 qwen-max，以获得最佳性能
+            orchestrator_model = "qwen-max"
+            self.agent = create_progressive_agent(
+                model_name=orchestrator_model,
+                temperature=0.3,  # orchestrator 使用较低温度
             )
-            print(f"✅ Agent 创建成功（模型: {self.model_name}）\n")
+            print(f"✅ Agent 创建成功（渐进式披露模式）")
+            print(f"   Orchestrator: {orchestrator_model}")
+            print(f"   💡 Agent 会自动按需加载 Skills 的完整指令，节省 tokens\n")
         return self.agent
     
     def _extract_response_text(self, response) -> str:
@@ -121,6 +126,7 @@ class InteractiveTester:
         print("  - 输入 / 开头的命令执行特殊操作")
         print("  - chat 模式: 普通对话，不执行代码")
         print("  - test 模式: 自动提取并执行代码")
+        print("  - 当前使用渐进式披露模式（自动按需加载 Skills）")
         print()
         print("=" * 60)
         print()
@@ -187,11 +193,13 @@ class InteractiveTester:
                     self.model_type = ModelType.QWEN if model == "qwen" else ModelType.DEEPSEEK
                     self.model_name = "qwen-max" if model == "qwen" else "deepseek-chat"
                     self.agent = None  # 重置 Agent，下次调用时重新创建
-                    print(f"✅ 已切换到 {model} 模型\n")
+                    print(f"✅ 已切换到 {model} 模型")
+                    print(f"💡 注意: 渐进式披露模式统一使用 qwen-max 作为 orchestrator\n")
                 else:
                     print("❌ 无效的模型，请使用 qwen 或 deepseek\n")
             else:
-                print(f"当前模型: {self.model_type.value} ({self.model_name})\n")
+                print(f"当前模型: {self.model_type.value} ({self.model_name})")
+                print(f"💡 注意: 渐进式披露模式统一使用 qwen-max 作为 orchestrator\n")
         
         elif cmd == "/execute":
             if len(parts) > 1:
@@ -377,6 +385,9 @@ class InteractiveTester:
         print("=" * 60)
         print()
         print("欢迎使用交互式测试工具！")
+        print("✨ 当前使用渐进式披露模式（Progressive Disclosure）")
+        print("   Agent 会自动按需加载 Skills，节省 tokens")
+        print()
         print("输入 /help 查看帮助，输入 /exit 退出")
         print()
         self._print_status()

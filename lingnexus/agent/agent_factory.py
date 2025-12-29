@@ -179,4 +179,102 @@ class AgentFactory:
         )
         
         return agent
+    
+    def create_progressive_agent(
+        self,
+        model_type: ModelType | str = ModelType.QWEN,
+        model_name: str = "qwen-max",  # 默认使用 qwen-max
+        skill_type: str = "external",
+        api_key: Optional[str] = None,
+        temperature: float = 0.3,  # orchestrator 使用较低温度
+        max_tokens: int = 4096,
+        system_prompt: Optional[str] = None,
+    ) -> ReActAgent:
+        """
+        创建支持渐进式披露的 Agent（使用 qwen-max 作为 orchestrator）
+        
+        实现 Claude Skills 的渐进式披露机制：
+        1. 阶段1：初始化时只加载所有 Skills 的元数据（~100 tokens/Skill）
+        2. 阶段2：LLM 判断需要时，动态加载完整指令（~5k tokens）
+        3. 阶段3：按需访问资源文件（scripts/, references/, assets/）
+        
+        Args:
+            model_type: 模型类型（默认 QWEN）
+            model_name: 模型名称（默认 "qwen-max"）
+            skill_type: 技能类型（"external" 或 "internal"）
+            api_key: API Key
+            temperature: 温度参数（orchestrator 建议 0.3）
+            max_tokens: 最大生成 token 数
+            system_prompt: 自定义系统提示词
+        
+        Returns:
+            配置好的 ReActAgent 实例
+        
+        Examples:
+            >>> factory = AgentFactory()
+            >>> agent = factory.create_progressive_agent(model_name="qwen-max")
+            >>> response = await agent(Msg(name="user", content="创建一个 Word 文档"))
+        """
+        # 1. 创建模型（qwen-max）
+        model = create_model(
+            model_type=model_type,
+            model_name=model_name,
+            api_key=api_key,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        formatter = get_formatter(model_type)
+        
+        # 2. 加载所有 Skills 的元数据（阶段1）
+        metadata_prompt = self.skill_loader.get_skills_metadata_prompt(skill_type)
+        
+        # 4. 构建系统提示词（只包含元数据）
+        if system_prompt is None:
+            system_prompt = """你是一个智能编排器（Orchestrator），负责协调和管理多个技能。
+
+工作流程：
+1. **技能发现**：查看可用技能列表（元数据）
+2. **技能选择**：根据用户需求，判断需要哪个技能
+3. **指令加载**：使用 `load_skill_instructions` 工具加载选定技能的完整指令
+4. **任务执行**：根据完整指令规划并执行任务
+
+重要原则：
+- 初始时只看到技能的元数据（名称和描述），节省 tokens
+- 只有在确定需要某个技能时，才加载其完整指令
+- 一次只加载一个技能的完整指令，避免 token 浪费
+- 根据任务的复杂度，可能需要加载多个技能
+
+"""
+        
+        # 添加元数据提示词
+        if metadata_prompt:
+            system_prompt += f"\n{metadata_prompt}\n"
+        
+        system_prompt += """
+## 可用工具
+
+- `list_available_skills()`: 列出所有可用技能的元数据
+- `load_skill_instructions(skill_name)`: 加载指定技能的完整指令
+
+请根据用户需求，智能地选择和使用技能。
+"""
+        
+        # 5. 创建 Toolkit 并注册渐进式加载工具
+        toolkit = Toolkit()
+        # 注册渐进式加载工具（从 SkillLoader 获取）
+        progressive_tools = self.skill_loader.get_progressive_tools()
+        for tool_func in progressive_tools:
+            toolkit.register_tool_function(tool_func)
+        # 注意：这里不预先注册技能，让 Agent 按需加载
+        
+        # 6. 创建 Agent
+        agent = ReActAgent(
+            name="progressive_orchestrator",
+            sys_prompt=system_prompt,
+            model=model,
+            formatter=formatter,
+            toolkit=toolkit,
+        )
+        
+        return agent
 
