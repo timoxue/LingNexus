@@ -1,0 +1,39 @@
+2025-12-29 16:16:45,680 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 16:17:26,086 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "Lb5Lx4XT9gbxakHo24f9zU".
+2025-12-29 16:17:26,086 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 16:17:26,312 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 16:21:08,119 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "55bS5Uh9qWMUPEDFendyWV".
+2025-12-29 16:21:08,121 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 16:21:08,160 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 16:21:47,251 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "g5KnBgux7QFfWiYxezpUWR".
+2025-12-29 16:21:47,251 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 16:21:47,288 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 16:22:09,336 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "ZbJAnig5gSdtUCgKeDayTS".
+2025-12-29 16:22:09,336 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 16:22:09,376 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 16:22:40,521 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "VxNw9u9TFsunHdebA6Cg6R".
+2025-12-29 16:22:40,521 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 16:22:40,567 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 16:54:55,372 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "agrR2tNioQpaYv7pxEzwNk".
+2025-12-29 16:54:55,372 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 16:54:55,408 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 16:55:43,544 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "mbamcu5kjmmgVxPs2dRAy4".
+2025-12-29 16:55:43,544 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 16:55:43,579 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 16:56:04,303 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "DfoLtzFjuiGSqQsSqMY83G".
+2025-12-29 16:56:04,303 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 16:56:04,342 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 16:56:44,607 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "NVZzmRNhdGwcrKKKEqNJS9".
+2025-12-29 16:56:44,608 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 16:56:44,647 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 16:58:02,398 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "A7gqCheqxK4CicYK2Ef5YK".
+2025-12-29 16:58:02,398 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 16:58:02,437 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 17:02:17,675 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "8TLWttjquLc6cVYjJoUi6A".
+2025-12-29 17:02:17,675 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 17:02:17,724 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 17:27:35,613 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 17:37:07,240 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-29 17:40:28,328 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "EZWy23PYWzPom8sDxrPypf".
+2025-12-29 17:40:28,328 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
+2025-12-29 17:40:40,674 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
