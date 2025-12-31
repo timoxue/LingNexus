@@ -45,3 +45,15 @@
 2025-12-29 19:12:36,099 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251229
 2025-12-29 19:12:39,747 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
 2025-12-29 19:12:58,954 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'doc-coauthoring' from directory 'skills\external\doc-coauthoring'.
+2025-12-31 14:44:48,525 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "a4VZjcdz7HGGTrQfu6KxtC".
+2025-12-31 14:44:48,525 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251231
+2025-12-31 14:45:42,195 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-31 17:58:31,375 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "aWgB3uw8stxxx2PDoW5HMu".
+2025-12-31 17:58:31,375 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251231
+2025-12-31 17:59:48,192 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-31 18:06:27,468 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "Whw2SioraK8LL4cJKBibYw".
+2025-12-31 18:06:27,469 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251231
+2025-12-31 18:06:43,150 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.
+2025-12-31 18:07:56,443 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "aEeD58j3vDyvBrBvQMqD5J".
+2025-12-31 18:07:56,443 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20251231
+2025-12-31 18:08:08,950 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\external\docx'.

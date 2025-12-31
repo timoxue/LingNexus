@@ -109,9 +109,9 @@ async def main():
 asyncio.run(main())
 ```
 
-**工作流程**：
+**工作流程（完整的三层渐进式披露）**：
 
-1. **阶段1：初始化** - 只加载所有 Skills 的元数据（~100 tokens/Skill）
+1. **阶段1：元数据层（初始化）** - 只加载所有 Skills 的元数据（~100 tokens/Skill）
    ```
    可用技能列表：
    - docx: "处理 Word 文档的技能"
@@ -119,20 +119,32 @@ asyncio.run(main())
    - ...
    ```
 
-2. **阶段2：动态加载** - LLM 判断需要时，调用 `load_skill_instructions` 工具加载完整指令（~5k tokens）
+2. **阶段2：指令层（按需加载）** - LLM 判断需要时，调用 `load_skill_instructions` 工具加载完整指令（~5k tokens）
    ```
    Agent 判断：需要 docx 技能
    → 调用 load_skill_instructions("docx")
    → 加载完整的 SKILL.md 内容
    ```
 
-3. **阶段3：执行任务** - 根据完整指令规划并执行任务
+3. **阶段3：资源层（按需加载）** - 根据指令需要，加载参考文档和访问资源
+   ```
+   如果 SKILL.md 中引用了参考文档（如 docx-js.md, ooxml.md）
+   → 调用 load_skill_reference("docx", "docx-js.md")
+   → 加载参考文档内容
+   
+   如果需要访问 scripts/ 或 assets/ 目录
+   → 调用 get_skill_resource_path("docx", "scripts")
+   → 获取资源路径，通过文件系统访问
+   ```
+
+4. **阶段4：执行任务** - 根据完整指令、参考文档和资源规划并执行任务
 
 **优势**：
-- ✅ Token 效率高：初始只加载元数据
+- ✅ Token 效率高：初始只加载元数据（~100 tokens/Skill）
 - ✅ 可扩展性强：支持大量 Skills，不会 token 爆炸
-- ✅ 符合 Claude Skills 设计理念
-- ✅ 智能按需加载：只在需要时加载完整指令
+- ✅ 符合 Claude Skills 设计理念：完整实现三层渐进式披露
+- ✅ 智能按需加载：只在需要时加载完整指令和参考文档
+- ✅ 资源访问灵活：支持按需访问 references/, assets/, scripts/ 目录
 
 **适用场景**：
 - 大量 Skills（10+ 个）
@@ -276,15 +288,37 @@ LLM 分析：需要 docx 技能
 ```
 LLM 调用 #2（看到 docx 技能的完整指令）
     ↓
-LLM 规划：根据 SKILL.md 的说明，生成代码
+LLM 分析：SKILL.md 中引用了 docx-js.md 和 ooxml.md
+    ↓
+按需加载参考文档（如果指令中引用了）
+    ↓
+LLM 规划：根据 SKILL.md 和参考文档的说明，生成代码
     ↓
 生成 Python 代码（使用 python-docx 库）
 ```
 
-**阶段 4: 执行脚本（非 LLM 调用）**
+**阶段 4: 资源访问（按需）**
+
+```
+如果需要参考文档：
+    ↓
+调用 load_skill_reference("docx", "docx-js.md")
+    ↓
+加载参考文档内容到 context
+
+如果需要访问 scripts/ 或 assets/：
+    ↓
+调用 get_skill_resource_path("docx", "scripts")
+    ↓
+获取资源路径，通过文件系统访问
+```
+
+**阶段 5: 执行脚本（非 LLM 调用）**
 
 ```
 执行生成的代码
+    ↓
+访问 scripts/ 目录中的脚本
     ↓
 创建 .docx 文件
     ↓
@@ -296,8 +330,14 @@ LLM 规划：根据 SKILL.md 的说明，生成代码
 1. **LLM 调用在使用 Skill 之前**
    - 第一次调用：判断是否需要使用 Skill（基于元数据）
    - 第二次调用：规划如何使用 Skill（基于完整指令）
+   - 可能多次调用：按需加载参考文档
 
-2. **Skill 脚本的执行在 LLM 调用之后**
+2. **资源层的按需加载**
+   - **References**：参考文档按需加载到 context（如 docx-js.md, ooxml.md）
+   - **Assets**：资源文件通过文件系统访问，不加载到 context
+   - **Scripts**：可执行脚本通过文件系统访问或执行
+
+3. **Skill 脚本的执行在 LLM 调用之后**
    - LLM 生成代码
    - 然后执行代码（不是 LLM 调用）
 
@@ -311,14 +351,46 @@ LLM 规划：根据 SKILL.md 的说明，生成代码
    - `load_skill_full_instructions()` - 加载完整指令
    - `get_skills_metadata_prompt()` - 生成元数据提示词
 
-2. **渐进式加载工具** - `progressive_skill_loader.py`
-   - `load_skill_instructions()` - 动态加载完整指令的工具
-   - `list_available_skills()` - 列出所有可用技能的工具
+2. **渐进式加载工具** - `SkillLoader` 类中的工具方法
+   - **阶段1（元数据层）**：
+     - `_tool_list_available_skills()` - 列出所有可用技能的元数据
+   - **阶段2（指令层）**：
+     - `_tool_load_skill_instructions()` - 动态加载完整指令（SKILL.md）
+   - **阶段3（资源层）**：
+     - `_tool_load_skill_reference()` - 加载参考文档（references/ 或根目录的 .md 文件）
+     - `_tool_list_skill_resources()` - 列出技能的所有资源
+     - `_tool_get_skill_resource_path()` - 获取资源路径（用于文件系统访问）
 
 3. **Progressive Agent** - `create_progressive_agent()`
    - 使用 qwen-max 作为 orchestrator
    - 初始只加载元数据到系统提示词
-   - 通过工具实现动态加载
+   - 通过工具实现动态加载（指令层 + 资源层）
+
+### 资源层工具使用示例
+
+**加载参考文档**：
+
+```python
+# Agent 会自动调用
+load_skill_reference("docx", "docx-js.md")  # 加载 docx-js.md
+load_skill_reference("docx", "ooxml.md")    # 加载 ooxml.md
+```
+
+**列出技能资源**：
+
+```python
+# Agent 会自动调用
+list_skill_resources("docx")  # 列出所有资源（references, assets, scripts）
+```
+
+**获取资源路径**：
+
+```python
+# Agent 会自动调用
+get_skill_resource_path("docx", "scripts")   # 获取 scripts/ 目录路径
+get_skill_resource_path("docx", "assets")    # 获取 assets/ 目录路径
+get_skill_resource_path("docx", "references")  # 获取 references/ 目录路径
+```
 
 ### 使用示例
 

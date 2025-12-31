@@ -4,12 +4,20 @@
 """
 
 from .skill_loader import SkillLoader
-from .code_executor import extract_python_code, execute_python_code, extract_and_execute_code
+from .code_executor import (
+    extract_python_code,
+    execute_python_code,
+    execute_python_code_with_agentscope,
+    extract_and_execute_code,
+    extract_and_execute_code_async,
+)
 
 __all__ = [
     "SkillLoader",
     "extract_python_code",
     "execute_python_code",
+    "execute_python_code_with_agentscope",
     "extract_and_execute_code",
+    "extract_and_execute_code_async",
 ]
 

@@ -5,6 +5,9 @@ Skill 加载器
 
 import yaml
 import re
+import subprocess
+import json
+import sys
 from pathlib import Path
 from typing import Dict, Optional, List
 from agentscope.tool import Toolkit, ToolResponse
@@ -349,17 +352,342 @@ class SkillLoader:
             error_msg = f"❌ 错误: 列出技能失败 - {e}"
             return ToolResponse(content=error_msg)
     
+    def _tool_load_skill_reference(
+        self, 
+        skill_name: str, 
+        reference_file: str, 
+        skill_type: str = "external"
+    ) -> ToolResponse:
+        """
+        工具函数：加载技能的参考文档（渐进式披露 - 阶段3：references 层）
+        
+        当 SKILL.md 中引用了参考文档时，使用此工具按需加载。
+        参考文档可能位于：
+        - references/ 目录（标准位置）
+        - 技能根目录（旧格式，如 docx-js.md, ooxml.md）
+        
+        Args:
+            skill_name: 技能名称（如 "docx", "pdf", "pptx"）
+            reference_file: 参考文件名（如 "docx-js.md", "ooxml.md", "references/api_docs.md"）
+            skill_type: 技能类型，默认为 "external"
+        
+        Returns:
+            ToolResponse 对象，包含参考文档内容
+        
+        Example:
+            load_skill_reference("docx", "docx-js.md")  # 加载 docx-js.md
+            load_skill_reference("docx", "ooxml.md")    # 加载 ooxml.md
+        """
+        try:
+            skill_path = self.skills_base_dir / skill_type / skill_name
+            if not skill_path.exists():
+                error_msg = f"❌ 错误: 找不到技能 {skill_name}"
+                return ToolResponse(content=error_msg)
+            
+            # 尝试多个可能的路径
+            possible_paths = [
+                skill_path / reference_file,  # 根目录（旧格式）
+                skill_path / "references" / reference_file,  # references/ 目录
+                skill_path / reference_file.replace("references/", ""),  # 如果已经包含 references/
+            ]
+            
+            reference_path = None
+            for path in possible_paths:
+                if path.exists() and path.is_file():
+                    reference_path = path
+                    break
+            
+            if reference_path is None:
+                error_msg = f"❌ 错误: 找不到参考文档 {reference_file}（已尝试：根目录、references/ 目录）"
+                return ToolResponse(content=error_msg)
+            
+            # 读取参考文档内容
+            content_text = reference_path.read_text(encoding='utf-8')
+            content = f"✅ 已加载 {skill_name} 技能的参考文档：{reference_file}\n\n{content_text}"
+            return ToolResponse(content=content)
+        
+        except FileNotFoundError as e:
+            error_msg = f"❌ 错误: 找不到参考文档 {reference_file} - {e}"
+            return ToolResponse(content=error_msg)
+        except Exception as e:
+            error_msg = f"❌ 错误: 加载参考文档 {reference_file} 失败 - {e}"
+            return ToolResponse(content=error_msg)
+    
+    def _tool_list_skill_resources(
+        self, 
+        skill_name: str, 
+        skill_type: str = "external"
+    ) -> ToolResponse:
+        """
+        工具函数：列出技能的所有资源（渐进式披露 - 阶段3：资源层）
+        
+        列出技能的 references/, assets/, scripts/ 目录中的文件。
+        帮助 Agent 了解可用的资源。
+        
+        Args:
+            skill_name: 技能名称（如 "docx", "pdf", "pptx"）
+            skill_type: 技能类型，默认为 "external"
+        
+        Returns:
+            ToolResponse 对象，包含资源列表
+        """
+        try:
+            skill_path = self.skills_base_dir / skill_type / skill_name
+            if not skill_path.exists():
+                error_msg = f"❌ 错误: 找不到技能 {skill_name}"
+                return ToolResponse(content=error_msg)
+            
+            result_lines = [f"📦 {skill_name} 技能的资源列表：\n"]
+            
+            # 检查 references/ 目录
+            references_dir = skill_path / "references"
+            if references_dir.exists() and references_dir.is_dir():
+                ref_files = list(references_dir.glob("*"))
+                if ref_files:
+                    result_lines.append(f"\n📚 References/ 目录 ({len(ref_files)} 个文件):")
+                    for f in sorted(ref_files)[:20]:  # 最多显示20个
+                        if f.is_file():
+                            size = f.stat().st_size
+                            result_lines.append(f"   - {f.name} ({size} 字节)")
+                    if len(ref_files) > 20:
+                        result_lines.append(f"   ... 还有 {len(ref_files) - 20} 个文件")
+            
+            # 检查根目录的 .md 文件（旧格式的参考文档）
+            root_md_files = list(skill_path.glob("*.md"))
+            root_md_files = [f for f in root_md_files if f.name != "SKILL.md"]
+            if root_md_files:
+                result_lines.append(f"\n📄 根目录参考文档 ({len(root_md_files)} 个文件):")
+                for f in sorted(root_md_files):
+                    size = f.stat().st_size
+                    result_lines.append(f"   - {f.name} ({size} 字节)")
+            
+            # 检查 assets/ 目录
+            assets_dir = skill_path / "assets"
+            if assets_dir.exists() and assets_dir.is_dir():
+                asset_files = list(assets_dir.rglob("*"))
+                asset_files = [f for f in asset_files if f.is_file()]
+                if asset_files:
+                    result_lines.append(f"\n🎨 Assets/ 目录 ({len(asset_files)} 个文件):")
+                    for f in sorted(asset_files)[:20]:  # 最多显示20个
+                        size = f.stat().st_size
+                        rel_path = f.relative_to(assets_dir)
+                        result_lines.append(f"   - {rel_path} ({size} 字节)")
+                    if len(asset_files) > 20:
+                        result_lines.append(f"   ... 还有 {len(asset_files) - 20} 个文件")
+            
+            # 检查 scripts/ 目录
+            scripts_dir = skill_path / "scripts"
+            if scripts_dir.exists() and scripts_dir.is_dir():
+                script_files = list(scripts_dir.rglob("*"))
+                script_files = [f for f in script_files if f.is_file() and f.suffix in ['.py', '.sh', '.js', '.ts']]
+                if script_files:
+                    result_lines.append(f"\n🔧 Scripts/ 目录 ({len(script_files)} 个文件):")
+                    for f in sorted(script_files)[:20]:  # 最多显示20个
+                        size = f.stat().st_size
+                        rel_path = f.relative_to(scripts_dir)
+                        result_lines.append(f"   - {rel_path} ({size} 字节)")
+                    if len(script_files) > 20:
+                        result_lines.append(f"   ... 还有 {len(script_files) - 20} 个文件")
+            
+            if len(result_lines) == 1:
+                content = f"📭 {skill_name} 技能暂无资源文件"
+                return ToolResponse(content=content)
+            
+            result_lines.append(
+                "\n💡 提示: "
+                "- 使用 `load_skill_reference(skill_name, reference_file)` 加载参考文档\n"
+                "- 使用 `get_skill_resource_path(skill_name, resource_type)` 获取资源路径"
+            )
+            
+            content = "\n".join(result_lines)
+            return ToolResponse(content=content)
+        
+        except Exception as e:
+            error_msg = f"❌ 错误: 列出资源失败 - {e}"
+            return ToolResponse(content=error_msg)
+    
+    def _tool_get_skill_resource_path(
+        self, 
+        skill_name: str, 
+        resource_type: str,  # "scripts", "assets", "references"
+        skill_type: str = "external"
+    ) -> ToolResponse:
+        """
+        工具函数：获取技能资源的路径（用于文件系统访问）
+        
+        返回资源的绝对路径，Agent 可以通过文件系统访问。
+        适用于需要直接访问文件或执行脚本的场景。
+        
+        Args:
+            skill_name: 技能名称（如 "docx", "pdf", "pptx"）
+            resource_type: 资源类型（"scripts", "assets", "references"）
+            skill_type: 技能类型，默认为 "external"
+        
+        Returns:
+            ToolResponse 对象，包含资源路径
+        
+        Example:
+            get_skill_resource_path("docx", "scripts")  # 获取 scripts 目录路径
+        """
+        try:
+            skill_path = self.skills_base_dir / skill_type / skill_name
+            if not skill_path.exists():
+                error_msg = f"❌ 错误: 找不到技能 {skill_name}"
+                return ToolResponse(content=error_msg)
+            
+            valid_types = ["scripts", "assets", "references"]
+            if resource_type not in valid_types:
+                error_msg = f"❌ 错误: 无效的资源类型 {resource_type}，有效类型：{', '.join(valid_types)}"
+                return ToolResponse(content=error_msg)
+            
+            resource_path = skill_path / resource_type
+            
+            if not resource_path.exists():
+                error_msg = f"❌ 错误: {skill_name} 技能没有 {resource_type}/ 目录"
+                return ToolResponse(content=error_msg)
+            
+            # 返回绝对路径
+            abs_path = resource_path.resolve()
+            content = f"✅ {skill_name} 技能的 {resource_type}/ 目录路径：\n\n{abs_path}\n\n💡 提示: 可以通过此路径访问资源文件"
+            return ToolResponse(content=content)
+        
+        except Exception as e:
+            error_msg = f"❌ 错误: 获取资源路径失败 - {e}"
+            return ToolResponse(content=error_msg)
+    
+    def _tool_check_and_fix_js(
+        self,
+        js_code: str,
+    ) -> ToolResponse:
+        """
+        工具函数：检查和修复 JavaScript 代码（使用 js-checker skill）
+        
+        此工具会：
+        1. 检查 Node.js 版本
+        2. 修复全角符号等常见问题
+        3. 检查代码语法
+        4. 验证代码可执行性
+        5. 返回执行命令供 execute_shell_command 使用
+        
+        Args:
+            js_code: JavaScript 代码字符串
+        
+        Returns:
+            ToolResponse 对象，包含检查结果和执行命令
+        """
+        try:
+            # 查找 js-checker skill 的脚本路径
+            js_checker_path = self.skills_base_dir / "internal" / "js-checker" / "scripts" / "check_and_fix_js.py"
+            
+            if not js_checker_path.exists():
+                error_msg = "❌ 错误: js-checker skill 未找到"
+                return ToolResponse(content=error_msg)
+            
+            # 调用检查脚本
+            # 使用 errors='replace' 处理编码错误（Windows 系统可能输出 GBK 编码）
+            process = subprocess.run(
+                [sys.executable, str(js_checker_path), "-"],
+                input=js_code,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',  # 处理编码错误，用替换字符代替无法解码的字节
+                timeout=30,
+            )
+            
+            if process.returncode != 0:
+                error_msg = f"❌ 错误: 检查 JavaScript 代码失败\n{process.stderr}"
+                return ToolResponse(content=error_msg)
+            
+            # 解析 JSON 结果
+            try:
+                check_result = json.loads(process.stdout)
+            except json.JSONDecodeError as e:
+                error_msg = f"❌ 错误: 解析检查结果失败 - {e}\n输出: {process.stdout}"
+                return ToolResponse(content=error_msg)
+            
+            # 格式化返回结果
+            result_lines = ["✅ JavaScript 代码检查完成\n"]
+            
+            # Node.js 版本信息
+            node_version = check_result.get("node_version", {})
+            if node_version.get("installed"):
+                result_lines.append(f"📦 Node.js 版本: {node_version.get('version', 'unknown')}")
+                if not node_version.get("meets_requirement"):
+                    result_lines.append("⚠️  警告: Node.js 版本可能不支持某些语法特性")
+            else:
+                result_lines.append(f"❌ Node.js 未安装: {node_version.get('error', 'unknown')}")
+            
+            # 语法检查结果
+            if check_result.get("syntax_ok"):
+                result_lines.append("✅ 语法检查: 通过")
+            else:
+                result_lines.append("❌ 语法检查: 失败")
+                if check_result.get("errors"):
+                    result_lines.append(f"   错误: {check_result['errors'][0]}")
+            
+            # 修复信息
+            fixes_applied = check_result.get("fixes_applied", [])
+            if fixes_applied:
+                result_lines.append(f"🔧 已修复 {len(fixes_applied)} 个问题:")
+                for fix in fixes_applied[:5]:  # 最多显示5个
+                    result_lines.append(f"   - {fix.get('type', 'unknown')}: {fix.get('original', '')} → {fix.get('fixed', '')}")
+            
+            # 验证结果
+            if check_result.get("validation_ok"):
+                result_lines.append("✅ 代码验证: 通过，可以执行")
+            else:
+                result_lines.append("⚠️  代码验证: 失败或未验证")
+            
+            # 执行命令
+            execute_command = check_result.get("execute_command")
+            if execute_command:
+                result_lines.append(f"\n💡 执行命令（供 execute_shell_command 使用）:")
+                result_lines.append(f"   {execute_command}")
+            
+            # 警告信息
+            warnings = check_result.get("warnings", [])
+            if warnings:
+                result_lines.append(f"\n⚠️  警告:")
+                for warning in warnings:
+                    result_lines.append(f"   - {warning}")
+            
+            # 错误信息
+            errors = check_result.get("errors", [])
+            if errors:
+                result_lines.append(f"\n❌ 错误:")
+                for error in errors:
+                    result_lines.append(f"   - {error}")
+            
+            content = "\n".join(result_lines)
+            return ToolResponse(content=content)
+        
+        except subprocess.TimeoutExpired:
+            error_msg = "❌ 错误: 检查 JavaScript 代码超时（>30秒）"
+            return ToolResponse(content=error_msg)
+        except Exception as e:
+            error_msg = f"❌ 错误: 检查 JavaScript 代码失败 - {e}"
+            return ToolResponse(content=error_msg)
+    
     def get_progressive_tools(self) -> List:
         """
         获取渐进式披露工具函数列表
         
         这些工具函数可以注册到 Toolkit 供 Agent 使用。
+        包括：
+        - 阶段1：元数据层工具
+        - 阶段2：指令层工具
+        - 阶段3：资源层工具
         
         Returns:
             工具函数列表
         """
         return [
-            self._tool_load_skill_instructions,
-            self._tool_list_available_skills,
+            self._tool_list_available_skills,      # 阶段1：列出可用技能（元数据）
+            self._tool_load_skill_instructions,     # 阶段2：加载完整指令
+            self._tool_load_skill_reference,       # 阶段3：加载参考文档
+            self._tool_list_skill_resources,       # 阶段3：列出资源
+            self._tool_get_skill_resource_path,     # 阶段3：获取资源路径
+            self._tool_check_and_fix_js,           # 特殊工具：JavaScript 代码检查
         ]
 

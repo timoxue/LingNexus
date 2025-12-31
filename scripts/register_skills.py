@@ -194,6 +194,16 @@ def register_all_skills(toolkit: Toolkit | None = None):
         print(f'❌ 注册 xlsx 失败: {e}')
         skills_failed += 1
 
+    # js-checker (internal)
+    try:
+        toolkit.register_agent_skill(
+            skill_dir=str(base_dir / 'skills/internal/js-checker')
+        )
+        skills_registered += 1
+    except Exception as e:
+        print(f'❌ 注册 js-checker 失败: {e}')
+        skills_failed += 1
+
     print(f'\n✅ 成功注册 {{skills_registered}} 个 Skills')
     if skills_failed > 0:
         print(f'⚠️  {{skills_failed}} 个 Skills 注册失败')

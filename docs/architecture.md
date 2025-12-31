@@ -98,9 +98,12 @@ ReActAgent 接收（已包含所有 Skills 的完整指令）
 
 实现 Claude Skills 的渐进式披露机制：
 
-1. **阶段1**：初始化时只加载所有 Skills 的元数据（~100 tokens/Skill）
-2. **阶段2**：LLM 判断需要时，动态加载完整指令（~5k tokens）
-3. **阶段3**：按需访问资源文件（scripts/, references/, assets/）
+1. **阶段1（元数据层）**：初始化时只加载所有 Skills 的元数据（~100 tokens/Skill）
+2. **阶段2（指令层）**：LLM 判断需要时，动态加载完整指令（~5k tokens）
+3. **阶段3（资源层）**：按需访问资源文件
+   - **References**：按需加载参考文档（references/ 或根目录的 .md 文件）
+   - **Assets**：通过文件系统访问资源文件（不加载到 context）
+   - **Scripts**：通过文件系统访问或执行脚本
 
 **工作流程**：
 
@@ -113,9 +116,17 @@ LLM 调用 #1：分析需求 → 判断需要哪个 Skill（基于元数据）
     ↓
 调用 load_skill_instructions 工具
     ↓
-动态加载选定 Skill 的完整指令
+动态加载选定 Skill 的完整指令（SKILL.md）
     ↓
 LLM 调用 #2：根据完整指令规划如何使用 Skill
+    ↓
+如果指令中引用了参考文档，调用 load_skill_reference 工具
+    ↓
+按需加载参考文档（如 docx-js.md, ooxml.md）
+    ↓
+如果需要访问资源，调用 get_skill_resource_path 工具
+    ↓
+获取资源路径，通过文件系统访问 scripts/, assets/ 等
     ↓
 生成代码并执行
     ↓
@@ -126,6 +137,8 @@ LLM 调用 #2：根据完整指令规划如何使用 Skill
 - LLM 调用发生在使用 Skill 之前
 - 第一次调用：判断是否需要使用 Skill（基于元数据）
 - 第二次调用：规划如何使用 Skill（基于完整指令）
+- 可能多次调用：按需加载参考文档
+- 资源层按需访问：references 加载到 context，assets/scripts 通过文件系统访问
 - Skill 脚本的执行在 LLM 调用之后
 
 **架构组件**：

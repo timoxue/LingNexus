@@ -5,8 +5,16 @@ Agent 全局配置模块
 注意：不用于模型配置，模型配置请使用 model_config.py
 """
 
+import os
+import sys
 import agentscope
 from typing import Optional
+
+# Windows 编码修复：设置环境变量，确保子进程使用 UTF-8 编码
+if sys.platform == 'win32':
+    # 确保子进程使用 UTF-8 编码（AgentScope 的 subprocess 会继承此设置）
+    os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
+    os.environ.setdefault('PYTHONLEGACYWINDOWSSTDIO', '0')
 
 
 def init_agentscope(

@@ -4,9 +4,12 @@
 
 ### Claude Skills 设计理念
 1. **渐进式披露（Progressive Disclosure）**：三层加载架构
-   - 元数据层（约 100 tokens/Skill）
-   - 指令层（< 5k tokens）
-   - 资源层（按需加载）
+   - **元数据层**（约 100 tokens/Skill）：name + description
+   - **指令层**（< 5k tokens）：SKILL.md 完整内容
+   - **资源层**（按需加载）：
+     - **References**：参考文档（references/ 目录或根目录的 .md 文件）
+     - **Assets**：资源文件（assets/ 目录，不加载到 context）
+     - **Scripts**：可执行脚本（scripts/ 目录，通过文件系统访问）
 
 2. **模块化设计**：每个 Skill 独立封装特定功能
 3. **跨平台可移植性**：可在不同平台间无缝工作
@@ -20,11 +23,14 @@
 Claude Skills 采用三层加载架构：
 
 ```
-1. 元数据层（初始化时）
+1. 元数据层（初始化时，~100 tokens/Skill）
    ↓ LLM 调用 #1：判断是否需要使用 Skill
-2. 指令层（判断需要时加载）
+2. 指令层（判断需要时加载，~5k tokens）
    ↓ LLM 调用 #2：根据指令规划如何使用 Skill
 3. 资源层（按需加载）
+   ├── References：参考文档（按需加载到 context）
+   ├── Assets：资源文件（通过文件系统访问）
+   └── Scripts：可执行脚本（通过文件系统访问或执行）
    ↓ 执行脚本/工具
 ```
 
@@ -64,10 +70,28 @@ LLM 规划：根据 SKILL.md 的说明，生成代码
 生成 Python 代码（使用 python-docx 库）
 ```
 
-**阶段 4: 执行脚本（非 LLM 调用）**
+**阶段 4: 资源层访问（按需）**
+
+```
+如果需要参考文档（如 SKILL.md 中引用了 docx-js.md）：
+    ↓
+调用 load_skill_reference("docx", "docx-js.md")
+    ↓
+加载参考文档内容到 context
+
+如果需要访问 scripts/ 或 assets/：
+    ↓
+调用 get_skill_resource_path("docx", "scripts")
+    ↓
+获取资源路径，通过文件系统访问
+```
+
+**阶段 5: 执行脚本（非 LLM 调用）**
 
 ```
 执行生成的代码
+    ↓
+访问 scripts/ 目录中的脚本
     ↓
 创建 .docx 文件
     ↓
@@ -80,14 +104,21 @@ LLM 规划：根据 SKILL.md 的说明，生成代码
    - 第一次调用：判断是否需要使用 Skill（基于元数据）
    - 第二次调用：规划如何使用 Skill（基于完整指令）
 
-2. **Skill 脚本的执行在 LLM 调用之后**
+2. **资源层的按需访问**
+   - **References**：参考文档按需加载到 context（如 docx-js.md, ooxml.md）
+   - **Assets**：资源文件通过文件系统访问，不加载到 context
+   - **Scripts**：可执行脚本通过文件系统访问或执行
+
+3. **Skill 脚本的执行在 LLM 调用之后**
    - LLM 生成代码
    - 然后执行代码（不是 LLM 调用）
 
 这个设计确保了：
-- **Token 效率**：初始只加载元数据，节省 tokens
+- **Token 效率**：初始只加载元数据（~100 tokens/Skill），节省 tokens
 - **智能选择**：LLM 可以根据任务需求智能选择 Skills
-- **按需加载**：只在需要时加载完整指令，避免浪费
+- **按需加载**：只在需要时加载完整指令（~5k tokens）和参考文档
+- **资源访问灵活**：支持按需访问 references/, assets/, scripts/ 目录
+- **完整实现**：符合 Claude Skills 的三层渐进式披露机制
 
 ### AgentScope AgentSkill 设计理念
 1. **渐进式披露机制**：三阶段按需加载

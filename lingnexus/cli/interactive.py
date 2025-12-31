@@ -17,7 +17,7 @@ if sys.platform == 'win32':
 
 from ..config import init_agentscope, ModelType
 from ..agent import create_progressive_agent  # 通过 react_agent.py 作为统一入口，使用渐进式披露
-from ..utils.code_executor import extract_and_execute_code
+from ..utils.code_executor import extract_and_execute_code, extract_and_execute_code_async
 from agentscope.message import Msg
 
 
@@ -276,19 +276,26 @@ class InteractiveTester:
             # 检查是否包含代码
             if '```python' in response_text or '```' in response_text:
                 print("\n" + "=" * 60)
-                print("自动执行代码")
+                print("自动执行代码（使用 AgentScope 内置工具）")
                 print("=" * 60)
                 
-                result = extract_and_execute_code(response_text)
+                # 使用异步版本（在异步环境中）
+                result = await extract_and_execute_code_async(response_text)
                 
                 if result.get('code'):
                     print("✅ 代码提取成功")
                     if result['success']:
                         print("✅ 代码执行成功")
                         if result.get('output'):
-                            print(f"输出: {result['output']}")
+                            print(f"输出:\n{result['output']}")
+                        if result.get('returncode') is not None:
+                            print(f"返回码: {result['returncode']}")
                     else:
-                        print(f"❌ 代码执行失败: {result.get('error', 'Unknown error')}")
+                        print(f"❌ 代码执行失败")
+                        if result.get('error'):
+                            print(f"错误: {result['error']}")
+                        if result.get('returncode') is not None:
+                            print(f"返回码: {result['returncode']}")
                 else:
                     print("⚠️  未找到可执行代码")
                 

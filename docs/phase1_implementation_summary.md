@@ -1,7 +1,10 @@
 # Phase 1 实现总结
 
-> **更新日期**: 2024-12-19  
-> **新增功能**: 渐进式披露机制（Progressive Disclosure）
+> **更新日期**: 2024-12-29  
+> **新增功能**: 完整的三层渐进式披露机制（Progressive Disclosure）
+> - ✅ 阶段1：元数据层
+> - ✅ 阶段2：指令层
+> - ✅ 阶段3：资源层（References, Assets, Scripts）
 
 ## ✅ 已完成功能
 
@@ -260,9 +263,13 @@ print(response)
    - 支持完整指令的动态加载
    - 元数据和指令缓存机制
 
-2. **渐进式加载工具** (`lingnexus/utils/progressive_skill_loader.py`)
-   - `load_skill_instructions()` - 动态加载工具
-   - `list_available_skills()` - 列出技能工具
+2. **渐进式加载工具**（已整合到 `SkillLoader` 类中）
+   - **阶段1（元数据层）**：`_tool_list_available_skills()` - 列出可用技能
+   - **阶段2（指令层）**：`_tool_load_skill_instructions()` - 加载完整指令
+   - **阶段3（资源层）**：
+     - `_tool_load_skill_reference()` - 加载参考文档
+     - `_tool_list_skill_resources()` - 列出所有资源
+     - `_tool_get_skill_resource_path()` - 获取资源路径
 
 3. **Progressive Agent** (`lingnexus/agent/agent_factory.py`)
    - `create_progressive_agent()` - 创建支持渐进式披露的 Agent
@@ -270,9 +277,10 @@ print(response)
 ### 优势
 
 - ✅ **Token 效率高**：初始只加载元数据（~100 tokens/Skill）
-- ✅ **智能按需加载**：只在需要时加载完整指令（~5k tokens）
+- ✅ **智能按需加载**：只在需要时加载完整指令（~5k tokens）和参考文档
+- ✅ **资源访问灵活**：支持按需访问 references/, assets/, scripts/ 目录
 - ✅ **可扩展性强**：支持大量 Skills，不会 token 爆炸
-- ✅ **符合设计理念**：完全实现 Claude Skills 的渐进式披露机制
+- ✅ **符合设计理念**：完整实现 Claude Skills 的三层渐进式披露机制
 
 ### 使用场景
 

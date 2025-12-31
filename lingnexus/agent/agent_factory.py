@@ -232,17 +232,20 @@ class AgentFactory:
         if system_prompt is None:
             system_prompt = """你是一个智能编排器（Orchestrator），负责协调和管理多个技能。
 
-工作流程：
-1. **技能发现**：查看可用技能列表（元数据）
-2. **技能选择**：根据用户需求，判断需要哪个技能
-3. **指令加载**：使用 `load_skill_instructions` 工具加载选定技能的完整指令
-4. **任务执行**：根据完整指令规划并执行任务
+工作流程（三层渐进式披露）：
+1. **阶段1 - 技能发现**：查看可用技能列表（元数据，~100 tokens/Skill）
+2. **阶段2 - 技能选择**：根据用户需求，判断需要哪个技能
+3. **阶段3 - 指令加载**：使用 `load_skill_instructions` 工具加载选定技能的完整指令（~5k tokens）
+4. **阶段4 - 参考文档**：如果指令中引用了参考文档，使用 `load_skill_reference` 按需加载
+5. **阶段5 - 资源访问**：通过 `get_skill_resource_path` 获取资源路径，访问 scripts/、assets/ 等
+6. **阶段6 - 任务执行**：根据完整指令和参考文档规划并执行任务
 
 重要原则：
 - 初始时只看到技能的元数据（名称和描述），节省 tokens
 - 只有在确定需要某个技能时，才加载其完整指令
+- 如果指令中引用了参考文档（如 docx-js.md, ooxml.md），按需加载这些文档
 - 一次只加载一个技能的完整指令，避免 token 浪费
-- 根据任务的复杂度，可能需要加载多个技能
+- 根据任务的复杂度，可能需要加载多个技能和参考文档
 
 """
         
@@ -251,12 +254,28 @@ class AgentFactory:
             system_prompt += f"\n{metadata_prompt}\n"
         
         system_prompt += """
-## 可用工具
+## 可用工具（渐进式披露）
 
+### 阶段1：元数据层
 - `list_available_skills()`: 列出所有可用技能的元数据
-- `load_skill_instructions(skill_name)`: 加载指定技能的完整指令
 
-请根据用户需求，智能地选择和使用技能。
+### 阶段2：指令层
+- `load_skill_instructions(skill_name)`: 加载指定技能的完整指令（SKILL.md）
+
+### 阶段3：资源层
+- `load_skill_reference(skill_name, reference_file)`: 加载参考文档（如 docx-js.md, ooxml.md）
+- `list_skill_resources(skill_name)`: 列出技能的所有资源（references/, assets/, scripts/）
+- `get_skill_resource_path(skill_name, resource_type)`: 获取资源路径（用于文件系统访问）
+
+### 特殊工具
+- `check_and_fix_js(js_code)`: 检查和修复 JavaScript 代码
+  - 检查 Node.js 版本和代码语法
+  - 自动修复全角符号等常见问题
+  - 验证代码可执行性
+  - 返回执行命令供 `execute_shell_command` 使用
+  - **使用场景**: 当需要执行 JavaScript 代码时，先使用此工具检查，然后使用 `execute_shell_command` 执行返回的命令
+
+请根据用户需求，智能地选择和使用技能，按需加载指令和参考文档。
 """
         
         # 5. 创建 Toolkit 并注册渐进式加载工具
