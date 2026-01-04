@@ -1,7 +1,8 @@
 # 文档整理总结
 
 ## 整理完成时间
-2025-12-29
+- **初次整理**：2025-12-29
+- **第二次优化**：2026-01-04（删除临时调试文件和文档）
 
 ## 整理目标
 对 `docs/` 目录进行清理和整合，删除重复和过期文档，保留必要信息，建立清晰的文档结构。
@@ -62,22 +63,24 @@
 docs/
 ├── README.md                      # 文档目录索引
 ├── quick_start.md                 # 快速开始
+├── INSTALLATION.md                # 安装指南
 ├── cli_guide.md                   # CLI 使用指南（整合）
 ├── api_key_guide.md               # API Key 管理（整合）
 ├── model_config.md                # 模型配置（整合）
 ├── architecture.md                 # 架构设计（整合）
 ├── skill_integration.md           # Skill 集成指南
 ├── testing.md                     # 测试指南（整合）
+├── agentscope_builtin_tools.md    # AgentScope 内置工具
 ├── agentscope_studio_guide.md     # Studio 指南
 ├── claude_skills_compatibility.md  # 兼容性说明
-├── phase1_implementation_summary.md # Phase 1 总结
-└── package_structure_explanation.md # 包结构说明
+└── phase1_implementation_summary.md # Phase 1 总结
 ```
 
 ## 文档分类
 
 ### 📖 用户指南（User Guides）
 - `quick_start.md` - 快速开始
+- `INSTALLATION.md` - 安装指南
 - `cli_guide.md` - CLI 使用
 - `api_key_guide.md` - API Key 管理
 
@@ -88,12 +91,12 @@ docs/
 
 ### 📚 参考文档（Reference）
 - `testing.md` - 测试指南
+- `agentscope_builtin_tools.md` - AgentScope 内置工具
 - `agentscope_studio_guide.md` - Studio 指南
 - `claude_skills_compatibility.md` - 兼容性说明
 
 ### 📝 项目文档（Project Docs）
 - `phase1_implementation_summary.md` - Phase 1 总结
-- `package_structure_explanation.md` - 包结构说明
 
 ## 优势
 
@@ -105,11 +108,26 @@ docs/
 
 ## 统计
 
-- **整理前**：23 个文档文件
-- **整理后**：12 个文档文件
-- **删除**：11 个重复/过期文档
-- **合并**：5 组重复文档
-- **新建**：3 个整合文档
+- **初次整理**：23 个文档文件 → 12 个文档文件
+- **第二次优化**：删除 7 个临时/重复文档
+- **当前**：13 个文档文件
+- **删除的临时文档**：
+  - `code_execution_architecture.md` - 临时架构分析
+  - `code_execution_logic_explained.md` - 临时逻辑说明
+  - `code_execution_error_handling.md` - 临时错误处理文档
+  - `ERROR_HANDLING_IMPROVEMENTS.md` - 临时改进总结
+  - `MULTI_LANGUAGE_CODE_EXECUTION_IMPLEMENTATION.md` - 临时实现文档
+  - `encoding_fix.md` - 临时修复文档
+  - `package_structure_explanation.md` - 临时包结构说明
+- **删除的测试文件**：
+  - `test_error_handling.py` - 临时错误处理测试
+  - `test_quick_verify.py` - 临时快速验证测试
+  - `test_multi_language_execution.py` - 临时多语言测试
+  - `test_end_to_end_execution.py` - 临时端到端测试
+  - `test_code_extraction.py` - 临时代码提取测试
+  - `test_docx.py` - 临时 docx 测试
+- **删除的工具文件**：
+  - `lingnexus/utils/multi_language_executor.py` - 示例实现（功能已整合）
 
 ## 后续建议
 
@@ -117,4 +135,5 @@ docs/
 2. 新增文档时注意分类
 3. 定期检查过期文档
 4. 更新文档时同步更新 `docs/README.md`
+
 

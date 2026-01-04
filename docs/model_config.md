@@ -135,3 +135,4 @@ def get_formatter(model_type: ModelType | str) -> FormatterBase:
 - [API Key 管理指南](api_key_guide.md)
 - [架构设计](architecture.md)
 
+

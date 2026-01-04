@@ -7,6 +7,7 @@
 import subprocess
 import json
 import sys
+import os
 import tempfile
 from pathlib import Path
 
@@ -14,11 +15,11 @@ from pathlib import Path
 def validate_js(js_code: str, timeout: int = 10) -> dict:
     """
     验证 JavaScript 代码是否可以执行
-    
+
     Args:
         js_code: JavaScript 代码字符串
         timeout: 超时时间（秒）
-    
+
     Returns:
         dict: 包含验证结果的字典
     """
@@ -30,23 +31,39 @@ def validate_js(js_code: str, timeout: int = 10) -> dict:
         "returncode": None,
         "error": None,
     }
-    
+
+    # 获取项目根目录（向上查找包含 package.json 的目录）
+    current_dir = Path(__file__).resolve().parent
+    project_root = current_dir
+    for parent in [current_dir] + list(current_dir.parents):
+        if (parent / "package.json").exists():
+            project_root = parent
+            break
+
     try:
-        # 创建临时文件
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False, encoding="utf-8") as f:
-            f.write(js_code)
-            temp_file = f.name
-        
+        # 创建临时文件（在项目根目录下，而不是系统临时目录）
+        temp_file = project_root / f"temp_{Path(__file__).stem}_{id(js_code) & 0xFFFFFFFF}.js"
+        temp_file.write_text(js_code, encoding="utf-8")
+
         try:
+            # 设置环境变量，确保 Node.js 能找到 node_modules
+            env = {
+                **os.environ,
+                "NODE_PATH": str(project_root / "node_modules"),
+            }
+
             # 尝试执行代码
+            # 重要：设置 cwd 为项目根目录，以便找到 node_modules
             # 使用 errors='replace' 处理编码错误（Windows 系统可能输出 GBK 编码）
             process = subprocess.run(
-                ["node", temp_file],
+                ["node", str(temp_file)],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
                 errors='replace',  # 处理编码错误
                 timeout=timeout,
+                cwd=str(project_root),  # 设置工作目录为项目根目录
+                env=env,  # 设置环境变量
             )
             
             result["returncode"] = process.returncode

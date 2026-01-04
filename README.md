@@ -144,7 +144,9 @@ asyncio.run(main())
 
 ### 1. 安装依赖
 
-使用 `uv` 安装项目依赖（推荐）：
+**重要**: 本项目需要同时安装 Python 依赖和 Node.js 依赖。
+
+#### Python 依赖（使用 uv）
 
 ```bash
 # 安装 uv（如果尚未安装）
@@ -154,9 +156,24 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 # Linux/Mac:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 安装项目依赖
+# 安装 Python 项目依赖
 uv sync
 ```
+
+#### Node.js 依赖（用于 docx 等技能）
+
+```bash
+# 安装 Node.js 项目依赖
+npm install
+
+# 或使用 yarn
+yarn install
+
+# 或使用 pnpm
+pnpm install
+```
+
+⚠️ **注意**: 某些技能（如 docx、pdf、pptx 等）依赖 Node.js 库，**必须**安装 Node.js 依赖才能正常使用。
 
 ### 2. 设置 API Key
 

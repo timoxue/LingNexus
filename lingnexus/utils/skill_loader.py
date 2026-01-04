@@ -19,7 +19,7 @@ class SkillLoader:
     def __init__(self, skills_base_dir: str | Path = "skills"):
         """
         初始化 Skill 加载器
-        
+
         Args:
             skills_base_dir: Skills 基础目录路径
         """
@@ -28,18 +28,45 @@ class SkillLoader:
         self._loaded_skills: Dict[str, Dict] = {}
         self._metadata_cache: Dict[str, Dict] = {}  # 元数据缓存
         self._full_instructions_cache: Dict[str, str] = {}  # 完整指令缓存
+
+    def _resolve_skill_type(self, skill_name: str, skill_type: str = "external") -> str:
+        """
+        解析技能类型（优先级检查：internal > external）
+
+        如果指定了 skill_type，直接使用。
+        如果 skill_type 为 "external" 或未指定，会先检查 internal 目录是否存在该技能。
+
+        Args:
+            skill_name: 技能名称
+            skill_type: 技能类型（"external", "internal", 或 "auto"）
+
+        Returns:
+            实际使用的技能类型（"internal" 或 "external"）
+        """
+        if skill_type == "internal":
+            return "internal"
+
+        # 检查 internal 目录是否存在该技能
+        internal_path = self.skills_base_dir / "internal" / skill_name
+        if internal_path.exists() and (internal_path / "SKILL.md").exists():
+            return "internal"
+
+        return skill_type  # 默认返回 external
     
     def load_skill(self, skill_name: str, skill_type: str = "external") -> Dict:
         """
         加载单个技能的信息
-        
+
         Args:
             skill_name: 技能名称（目录名）
-            skill_type: 技能类型（"external" 或 "internal"）
-        
+            skill_type: 技能类型（"external", "internal"，默认 "external"）
+                      注意：如果指定为 "external"，但 internal 目录存在同名技能，会优先使用 internal
+
         Returns:
             包含技能信息的字典
         """
+        # 解析技能类型（internal 优先）
+        skill_type = self._resolve_skill_type(skill_name, skill_type)
         skill_path = self.skills_base_dir / skill_type / skill_name
         
         if not skill_path.exists():
@@ -148,18 +175,21 @@ class SkillLoader:
     def load_skill_metadata_only(self, skill_name: str, skill_type: str = "external") -> Dict:
         """
         只加载技能的元数据（阶段1：渐进式披露）
-        
+
         Args:
             skill_name: 技能名称
-            skill_type: 技能类型
-        
+            skill_type: 技能类型（"external", "internal"，默认 "external"）
+                      注意：如果指定为 "external"，但 internal 目录存在同名技能，会优先使用 internal
+
         Returns:
             只包含元数据的字典
         """
+        # 解析技能类型（internal 优先）
+        skill_type = self._resolve_skill_type(skill_name, skill_type)
         cache_key = f"{skill_type}:{skill_name}"
         if cache_key in self._metadata_cache:
             return self._metadata_cache[cache_key]
-        
+
         skill_path = self.skills_base_dir / skill_type / skill_name
         if not skill_path.exists():
             raise FileNotFoundError(f"Skill 目录不存在: {skill_path}")
@@ -219,18 +249,21 @@ class SkillLoader:
     def load_skill_full_instructions(self, skill_name: str, skill_type: str = "external") -> str:
         """
         加载技能的完整指令（阶段2：渐进式披露）
-        
+
         Args:
             skill_name: 技能名称
-            skill_type: 技能类型
-        
+            skill_type: 技能类型（"external", "internal"，默认 "external"）
+                      注意：如果指定为 "external"，但 internal 目录存在同名技能，会优先使用 internal
+
         Returns:
             完整的 SKILL.md 内容
         """
+        # 解析技能类型（internal 优先）
+        skill_type = self._resolve_skill_type(skill_name, skill_type)
         cache_key = f"{skill_type}:{skill_name}"
         if cache_key in self._full_instructions_cache:
             return self._full_instructions_cache[cache_key]
-        
+
         skill_path = self.skills_base_dir / skill_type / skill_name
         skill_md = skill_path / "SKILL.md"
         
@@ -281,17 +314,18 @@ class SkillLoader:
     def _tool_load_skill_instructions(self, skill_name: str, skill_type: str = "external") -> ToolResponse:
         """
         工具函数：加载指定技能的完整指令（渐进式披露 - 阶段2）
-        
+
         当你确定需要使用某个技能时，调用此工具来加载该技能的完整指令。
         完整指令包含详细的使用方法、工作流程和示例。
-        
+
         Args:
             skill_name: 技能名称（如 "docx", "pdf", "pptx"）
             skill_type: 技能类型，默认为 "external"（外部技能）
-        
+                      注意：如果指定为 "external"，但 internal 目录存在同名技能，会优先使用 internal
+
         Returns:
             ToolResponse 对象，包含技能的完整指令内容
-        
+
         Example:
             load_skill_instructions("docx")  # 加载 docx 技能的完整指令
         """

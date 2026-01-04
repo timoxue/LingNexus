@@ -17,7 +17,8 @@ if sys.platform == 'win32':
 
 from ..config import init_agentscope, ModelType
 from ..agent import create_progressive_agent  # 通过 react_agent.py 作为统一入口，使用渐进式披露
-from ..utils.code_executor import extract_and_execute_code, extract_and_execute_code_async
+from ..utils.code_executor import extract_and_execute_code_async, extract_and_execute_multi_language
+from ..utils.code_executor import extract_code_from_text
 from agentscope.message import Msg
 
 
@@ -273,31 +274,55 @@ class InteractiveTester:
         
         # 根据模式处理
         if self.current_mode == "test" and self.auto_execute_code:
-            # 检查是否包含代码
-            if '```python' in response_text or '```' in response_text:
-                print("\n" + "=" * 60)
-                print("自动执行代码（使用 AgentScope 内置工具）")
-                print("=" * 60)
-                
-                # 使用异步版本（在异步环境中）
-                result = await extract_and_execute_code_async(response_text)
-                
-                if result.get('code'):
-                    print("✅ 代码提取成功")
-                    if result['success']:
-                        print("✅ 代码执行成功")
-                        if result.get('output'):
-                            print(f"输出:\n{result['output']}")
-                        if result.get('returncode') is not None:
-                            print(f"返回码: {result['returncode']}")
-                    else:
-                        print(f"❌ 代码执行失败")
-                        if result.get('error'):
-                            print(f"错误: {result['error']}")
-                        if result.get('returncode') is not None:
-                            print(f"返回码: {result['returncode']}")
+            # 检查是否有代码块
+            has_code_block = response_text.count('```') >= 2
+
+            if has_code_block:
+                # 先检查有哪些语言的代码
+                codes = extract_code_from_text(response_text)
+
+                # 过滤掉看起来像是"执行命令"的 bash 代码
+                # 如果 bash 代码只是展示执行命令（如 node -e, python 等），则跳过
+                if 'bash' in codes:
+                    bash_code = codes['bash']
+                    # 如果 bash 代码只是单行命令（如 node -e, python 等），跳过
+                    # 这些通常是 Agent 展示的执行结果，不需要再次执行
+                    if bash_code and '\n' not in bash_code.strip():
+                        # 检查是否是常见的代码执行命令
+                        command_prefixes = ['node -e', 'python -c', 'python3 -c', 'php -r']
+                        if any(bash_code.strip().startswith(prefix) for prefix in command_prefixes):
+                            # 这是展示的执行命令，不是要执行的 bash 脚本
+                            del codes['bash']
+
+                if codes:
+                    lang_names = list(codes.keys())
+                    print("\n" + "=" * 60)
+                    print(f"自动执行代码（检测到: {', '.join(lang_names)}）")
+                    print("=" * 60)
+
+                    # 使用多语言执行器（执行失败时保留临时文件用于调试）
+                    result = await extract_and_execute_multi_language(response_text, keep_temp_file=True)
+
+                    if result.get('code'):
+                        lang = result.get('language', 'unknown')
+                        print(f"✅ {lang.capitalize()} 代码提取成功")
+
+                        if result['success']:
+                            print(f"✅ {lang.capitalize()} 代码执行成功")
+                            if result.get('output'):
+                                print(f"输出:\n{result['output']}")
+                            if result.get('returncode') is not None:
+                                print(f"返回码: {result['returncode']}")
+                        else:
+                            print(f"❌ {lang.capitalize()} 代码执行失败")
+                            if result.get('error'):
+                                print(f"错误: {result['error']}")
+                            if result.get('temp_file'):
+                                print(f"💡 临时文件: {result['temp_file']}")
+                            if result.get('returncode') is not None:
+                                print(f"返回码: {result['returncode']}")
                 else:
-                    print("⚠️  未找到可执行代码")
+                    print("\n⚠️  检测到代码块，但无需执行的代码（可能是 Agent 展示的执行命令）")
                 
                 # 检查创建的文件
                 current_dir = Path.cwd()

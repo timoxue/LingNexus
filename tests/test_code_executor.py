@@ -3,13 +3,7 @@
 """
 
 import sys
-import io
 from pathlib import Path
-
-# Windows 编码修复
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 from lingnexus.utils.code_executor import extract_and_execute_code
 
@@ -49,4 +43,5 @@ print("File created")
 
 if __name__ == "__main__":
     test_simple_code()
+
 
