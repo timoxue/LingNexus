@@ -86,3 +86,7 @@
 2026-01-04 16:17:45,425 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "TACMAhUQwPe7WSjECjrMSA".
 2026-01-04 16:17:45,427 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20260104
 2026-01-04 16:17:48,256 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\internal\docx'.
+2026-01-05 08:59:56,914 | INFO    | _user_input:on_disconnect:209 - Disconnected from AgentScope Studio at http://localhost:3000
+2026-01-05 09:00:02,480 | INFO    | _user_input:on_connect:194 - Connected to AgentScope Studio at "http://localhost:3000" with run name "TnTHEACJZ9eKgKkL3nsKjM".
+2026-01-05 09:00:02,481 | INFO    | _user_input:on_connect:200 - View the run at: http://localhost:3000/projects/UnnamedProject_At20260105
+2026-01-05 09:00:34,425 | INFO    | _toolkit:register_agent_skill:1077 - Registered agent skill 'docx' from directory 'skills\internal\docx'.

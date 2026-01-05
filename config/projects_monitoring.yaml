@@ -1,0 +1,254 @@
+# 重点项目竞品监控配置
+# Key Projects Competitor Monitoring Configuration
+
+# 监控项目列表
+monitored_projects:
+  # 项目1: 帕利哌酮微晶
+  - name: "帕利哌酮微晶"
+    english_name: "Paliperidone Microcrystalline"
+    category: "精神分裂症"
+    type: "长效注射剂"
+    keywords:
+      - "帕利哌酮"
+      - "paliperidone"
+      - "微晶"
+      - "长效注射"
+      - "Invega Sustenna"  # 参比制剂商品名
+    companies:
+      - "强生 (Janssen)"
+      - "西安杨森"
+      - "齐鲁制药"
+      - "豪森药业"
+    data_sources:
+      - source: "CDE"
+        priority: 1
+        search_fields: ["药品名称", "企业名称"]
+      - source: "Insight"
+        priority: 1
+        track_fields: ["IND", "NDA", "ANDA", "获准临床", "获准上市"]
+      - source: "ClinicalTrials.gov"
+        priority: 2
+        search_terms: ["paliperidone", "Invega"]
+      - source: "WHO-ICTRP"
+        priority: 3
+        filter_by_company: true
+    monitoring_frequency: "每日"
+    alert_threshold: "状态变化时立即通知"
+
+  # 项目2: 注射用醋酸曲普瑞林微球
+  - name: "注射用醋酸曲普瑞林微球"
+    english_name: "Triptorelin Acetate Microspheres for Injection"
+    category: "中枢性性早熟"
+    indication: "中枢性性早熟 (CPP)"
+    type: "长效微球制剂"
+    keywords:
+      - "曲普瑞林"
+      - "triptorelin"
+      - "微球"
+      - "性早熟"
+      - "中枢性性早熟"
+      - "CPP"
+      - "Decapeptyl"  # 参比制剂商品名
+    specifications:
+      - "3.75mg"
+      - "15mg"
+      - "22.5mg"
+    companies:
+      - "益普生 (Ipsen)"
+      - "Ferring"
+      - "丽珠集团"
+      - "博恩特"
+    data_sources:
+      - source: "CDE"
+        priority: 1
+        search_fields: ["药品名称", "适应症"]
+      - source: "Insight"
+        priority: 1
+        track_fields: ["IND", "NDA", "临床默示许可", "排队序列号"]
+      - source: "ClinicalTrials.gov"
+        priority: 2
+        search_terms: ["triptorelin", "precocious puberty"]
+    monitoring_frequency: "每日"
+    special_notes: "关注微球制剂工艺改进"
+
+  # 项目3: JP-1366片
+  - name: "JP-1366片"
+    english_name: "JP-1366 Tablets"
+    category: "待确认"
+    type: "片剂"
+    keywords:
+      - "JP-1366"
+      - "JP1366"
+    research_needed: true
+    data_sources:
+      - source: "CDE"
+        priority: 1
+        search_fields: ["受理号", "药品名称"]
+      - source: "Insight"
+        priority: 1
+        track_fields: ["IND", "NDA", "受理号", "排队序列号"]
+    monitoring_frequency: "每周"
+    special_notes: "需要调研具体适应症和作用机制"
+
+  # 项目4: H001胶囊（华汇拓项目）
+  - name: "H001胶囊"
+    company: "华汇拓"
+    category: "待确认"
+    type: "胶囊剂"
+    keywords:
+      - "H001"
+      - "华汇拓"
+    companies:
+      - "华汇拓医药"
+    data_sources:
+      - source: "CDE"
+        priority: 1
+        search_fields: ["企业名称", "受理号"]
+      - source: "Insight"
+        priority: 1
+        track_fields: ["IND", "NDA", "临床默示许可"]
+      - source: "企业公告"
+        priority: 2
+        sources: ["华汇拓官网", "新闻发布"]
+    monitoring_frequency: "每周"
+    special_notes: "华汇拓在研项目，关注企业动态"
+
+  # 项目5: 司美格鲁肽（糖尿病）
+  - name: "司美格鲁肽"
+    english_name: "Semaglutide"
+    category: "糖尿病"
+    type: "GLP-1受体激动剂"
+    keywords:
+      - "司美格鲁肽"
+      - "semaglutide"
+      - "GLP-1"
+      - "Ozempic"  # 注射剂商品名
+      - "Rybelsus"  # 口服片剂商品名
+      - "Wegovy"   # 减重适应症商品名
+    companies:
+      - "诺和诺德 (Novo Nordisk)"
+      - "华东医药"
+      - "丽珠集团"
+      - "联邦制药"
+    data_sources:
+      - source: "CDE"
+        priority: 1
+        search_fields: ["药品名称", "企业名称"]
+      - source: "Insight"
+        priority: 1
+        track_fields: ["IND", "NDA", "ANDA", "获准上市", "排队序列号"]
+      - source: "ClinicalTrials.gov"
+        priority: 1
+        search_terms: ["semaglutide", "Ozempic", "Rybelsus"]
+      - source: "FDA"
+        priority: 2
+        track_approvals: true
+      - source: "news_monitor"
+        priority: 2
+        keywords: ["司美格鲁肽", "Ozempic", "减重", "糖尿病"]
+    monitoring_frequency: "每日"
+    alert_threshold: "重要新闻立即通知"
+    special_notes: |
+      关注多个适应症进展：
+      - 糖尿病（已上市）
+      - 减重（已上市）
+      - 心血管（研究中）
+      - NASH（研究中）
+      - 阿尔茨海默病（研究中）
+
+  # 项目6: SG1001片剂
+  - name: "SG1001片剂"
+    english_name: "SG1001 Tablets"
+    category: "待确认"
+    type: "片剂"
+    keywords:
+      - "SG1001"
+      - "SG-1001"
+    research_needed: true
+    data_sources:
+      - source: "CDE"
+        priority: 1
+        search_fields: ["受理号", "药品名称"]
+      - source: "Insight"
+        priority: 1
+        track_fields: ["IND", "NDA", "受理号"]
+      - source: "专利数据库"
+        priority: 2
+        search_fields: ["化合物专利", "用途专利"]
+    monitoring_frequency: "每周"
+    special_notes: "需要调研具体适应症和作用机制"
+
+# 全局监控配置
+monitoring_config:
+  # 默认监控频率
+  default_frequency: "每日"
+
+  # 频率选项
+  frequencies:
+    daily: "每日更新"
+    weekly: "每周更新"
+    monthly: "每月更新"
+    realtime: "实时监控"
+
+  # 数据源优先级
+  data_source_priority:
+    - "CDE"           # 国内临床（优先级1）
+    - "Insight"       # 申报进度（优先级1）
+    - "ClinicalTrials.gov"  # 国际临床（优先级2）
+    - "WHO-ICTRP"     # 国际补充（优先级3）
+    - "FDA"           # 监管批准（优先级2）
+    - "专利数据库"    # 专利布局（优先级3）
+    - "新闻监控"      # 行业动态（优先级2）
+
+  # 告警级别
+  alert_levels:
+    critical:
+      - "竞品获批上市"
+      - "竞品进入III期临床"
+      - "重大安全性事件"
+    high:
+      - "受理号状态变化"
+      - "临床试验启动"
+      - "专利授权"
+    medium:
+      - "企业新闻发布"
+      - "研究进展更新"
+    low:
+      - "文献发表"
+      - "会议报告"
+
+# 告警通知配置
+alert_config:
+  # 通知渠道
+  channels:
+    - type: "email"
+      enabled: false
+      recipients: []
+    - type: "webhook"
+      enabled: false
+      url: ""
+    - type: "dashboard"
+      enabled: true
+
+  # 摘要频率
+  summary_frequency: "每周"
+
+# 报告生成配置
+report_config:
+  # 报告类型
+  types:
+    - name: "每日简报"
+      frequency: "daily"
+      content: ["状态变化", "新增信息"]
+    - name: "周报"
+      frequency: "weekly"
+      content: ["进度汇总", "竞品对比", "趋势分析"]
+    - name: "月报"
+      frequency: "monthly"
+      content: ["全面分析", "市场格局", "预测建议"]
+
+  # 报告格式
+  formats:
+    - "markdown"
+    - "pdf"
+    - "excel"

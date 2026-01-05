@@ -62,4 +62,19 @@ htmlcov/
 .env.local
 .env.*.local
 
+# Runtime data and databases
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Output files
+output/
+
+# Logs (file and directory)
 logs
+logs/
+
+# AgentScope Studio
+agentscope_runs/
+agentscope_logs/
