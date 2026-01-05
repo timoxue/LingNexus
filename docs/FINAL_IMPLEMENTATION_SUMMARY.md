@@ -81,13 +81,11 @@ python -m lingnexus.cli search "关键词"     # 语义搜索
 
 **文件**: `config/projects_monitoring.yaml`
 
-**监控的6个重点项目**:
-1. 帕利哌酮微晶
-2. 注射用醋酸曲普瑞林微球
-3. JP-1366片
-4. H001胶囊
-5. 司美格鲁肽 ⭐
-6. SG1001片剂
+**监控项目**:
+1. 司美格鲁肽 (Semaglutide) ⭐
+   - 商品名: Ozempic、Rybelsus、Wegovy
+   - 关注适应症: 糖尿病、减重、心血管、NASH、阿尔茨海默病
+   - 竞争企业: 诺和诺德、华东医药、丽珠集团、联邦制药
 
 ## 测试验证
 

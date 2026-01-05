@@ -308,7 +308,7 @@ When adding new functionality:
 **Configuration File**:
 - Location: `config/projects_monitoring.yaml`
 - Contains project definitions and data source priorities
-- Monitored projects: 司美格鲁肽, 帕利哌酮微晶, etc.
+- Monitored projects: 司美格鲁肽 (Semaglutide)
 
 ## Important Notes
 

@@ -6,8 +6,10 @@
 
 - 🤖 **多智能体协作** - 基于 AgentScope 框架的可扩展多智能体系统
 - 🎯 **Claude Skills 兼容** - 完全兼容 Claude Skills 格式和渐进式披露机制
-- 📊 **竞品情报监控** - 自动化采集和分析医药领域竞争情报数据
-- 💾 **三层存储架构** - 原始数据、向量数据库、结构化数据库
+- 📊 **竞品情报监控** - 司美格鲁肽（Semaglutide）竞争情报自动化监控
+  - 多数据源采集：ClinicalTrials.gov、CDE、Insight
+  - 三层存储架构：原始数据、向量数据库、结构化数据库
+  - 智能分析：语义搜索、趋势分析、竞品对比
 - 🖥️ **统一 CLI 工具** - 一个入口，多种功能（交互式对话、监控、查询）
 - 🔍 **语义搜索** - 基于向量数据库的智能搜索能力
 
@@ -157,27 +159,29 @@ uv run python -m lingnexus.cli search "司美格鲁肽肥胖症"
 
 ### Phase 2: 竞品情报监控（已完成 ✅）
 
+**监控项目**: 司美格鲁肽（Semaglutide）GLP-1受体激动剂
+
 - ✅ 三层存储架构
-  - 原始数据存储（HTML/JSON）
-  - 结构化数据库（SQLAlchemy + SQLite）
-  - 向量数据库（ChromaDB，可选）
+  - 原始数据存储（HTML/JSON）- `data/raw/`
+  - 结构化数据库（SQLAlchemy + SQLite）- `data/intelligence.db`
+  - 向量数据库（ChromaDB，可选）- `data/vectordb/`
 
 - ✅ 数据采集系统
-  - ClinicalTrials.gov 爬虫（API v2）✅
-  - CDE 爬虫（Playwright）⚠️ 框架完成
+  - ClinicalTrials.gov 爬虫（API v2）✅ 已测试，采集10+条数据
+  - CDE 爬虫（Playwright）⚠️ 框架完成，需现场调试
   - Insight 爬虫（待实现）
 
 - ✅ 监控调度器
   - YAML 配置文件管理
-  - 多项目并发监控
   - 数据源优先级管理
   - 自动数据清洗和验证
+  - 日期类型自动转换
 
 - ✅ 统一 CLI 工具
-  - 监控命令（monitor）
-  - 状态查看（status）
-  - 数据库查询（db）
-  - 语义搜索（search）
+  - 监控命令（monitor）- 执行数据采集
+  - 状态查看（status）- 系统状态概览
+  - 数据库查询（db）- 灵活的数据查询
+  - 语义搜索（search）- 智能向量搜索
 
 ## 使用示例
 
@@ -239,16 +243,35 @@ db.close()
 
 ## 监控的项目
 
-系统当前监控 6 个重点项目：
+系统当前监控 **司美格鲁肽** (Semaglutide) - GLP-1受体激动剂
 
-1. **司美格鲁肽** (Semaglutide) - 糖尿病 GLP-1 受体激动剂 ⭐
-2. **帕利哌酮微晶** - 精神分裂症长效注射剂
-3. **注射用醋酸曲普瑞林微球** - 中枢性性早熟治疗
-4. **JP-1366片** - 代号项目
-5. **H001胶囊** - 华汇拓项目
-6. **SG1001片剂** - 代号项目
+### 项目详情
 
-配置文件：`config/projects_monitoring.yaml`
+**商品名**:
+- Ozempic（注射剂）- 糖尿病适应症
+- Rybelsus（口服片）- 糖尿病适应症
+- Wegovy（注射剂）- 减重适应症
+
+**关注适应症**:
+- ✅ 糖尿病（已上市）
+- ✅ 减重（已上市）
+- ⏳ 心血管（研究中）
+- ⏳ NASH（研究中）
+- ⏳ 阿尔茨海默病（研究中）
+
+**竞争企业**:
+- 诺和诺德 (Novo Nordisk) - 原研企业
+- 华东医药 - 合作伙伴
+- 丽珠集团 - 国内竞争
+- 联邦制药 - 国内竞争
+
+**数据源配置**: `config/projects_monitoring.yaml`
+
+### 采集的数据
+
+- ✅ 临床试验数据（ClinicalTrials.gov）- 10+条试验
+- ⏳ 申报进度（CDE）- 待调试
+- ⏳ 申报进度（Insight）- 待实现
 
 ## CLI 命令速查
 
@@ -362,6 +385,15 @@ uv run python -m lingnexus.cli status
 
 ## 项目状态
 
+### 监控数据统计
+
+- **项目数**: 1个（司美格鲁肽）
+- **临床试验**: 10+条（来自ClinicalTrials.gov）
+- **数据源状态**:
+  - ✅ ClinicalTrials.gov - 正常运行
+  - ⚠️ CDE - 框架完成，需现场调试
+  - ⏳ Insight - 待实现
+
 ### 完成度
 
 | 模块 | 完成度 | 状态 |
@@ -377,6 +409,20 @@ uv run python -m lingnexus.cli status
 | 测试 | 100% | ✅ 完成 |
 
 **总体完成度**: **85%**
+
+### 下一步计划
+
+**短期**:
+- 调试CDE爬虫
+- 实现变化检测和告警
+
+**中期**:
+- 实现Insight爬虫
+- 配置Celery定时任务
+
+**长期**:
+- FastAPI接口开发
+- 可视化仪表板
 
 ## 许可证
 
