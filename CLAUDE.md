@@ -8,6 +8,153 @@ LingNexus is a multi-agent system built on the AgentScope framework with Claude 
 
 The system now includes a **competitive intelligence monitoring system** for pharmaceutical data collection and analysis.
 
+## Project Structure
+
+```
+LingNexus/
+├── lingnexus/                    # Core application module
+│   ├── agent/                    # Agent creation and management
+│   │   ├── react_agent.py        # Unified Agent creation entry point (USER INTERFACE)
+│   │   └── agent_factory.py      # Agent factory (internal use only)
+│   ├── cli/                      # Command-line interface
+│   │   ├── __main__.py           # CLI main entry point
+│   │   ├── interactive.py        # Interactive chat mode
+│   │   └── monitoring.py         # Monitoring commands
+│   ├── config/                   # Configuration management
+│   │   ├── model_config.py       # Model configuration (Qwen, DeepSeek)
+│   │   ├── api_keys.py           # API key management
+│   │   └── agent_config.py       # Agent configuration
+│   ├── scheduler/                # Task scheduling
+│   │   └── monitoring.py         # Daily monitoring tasks
+│   ├── storage/                  # Three-tier storage architecture
+│   │   ├── raw.py                # Raw data storage (HTML/JSON)
+│   │   ├── structured.py         # Structured database (SQLite + SQLAlchemy)
+│   │   └── vector.py             # Vector database (ChromaDB, optional)
+│   └── utils/                    # Utility modules
+│       ├── skill_loader.py       # Skills loading and registration
+│       └── code_executor.py      # Code execution environment
+│
+├── skills/                       # Claude Skills directory
+│   ├── external/                 # External skills (Claude Skills format)
+│   │   ├── docx/                 # Word document generation
+│   │   ├── pdf/                 # PDF processing
+│   │   ├── pptx/                # PowerPoint generation
+│   │   └── [...other skills]
+│   └── internal/                 # Internal skills (custom)
+│       └── intelligence/        # Competitive intelligence monitoring
+│           └── scripts/         # Data collection scripts
+│               ├── clinical_trials_scraper.py  # ClinicalTrials.gov scraper
+│               └── cde_scraper.py              # CDE website scraper
+│
+├── config/                       # Configuration files
+│   └── projects_monitoring.yaml # Monitoring project configuration
+│
+├── examples/                     # Usage examples
+│   ├── docx_agent_example.py
+│   ├── progressive_agent_example.py
+│   ├── monitoring_example.py
+│   └── cde_scraper_example.py
+│
+├── tests/                        # Test files
+│   ├── test_setup.py
+│   ├── test_api_key.py
+│   ├── test_model_creation.py
+│   └── [...more tests]
+│
+├── scripts/                      # Utility scripts
+│   ├── load_claude_skills.py    # Load Claude Skills
+│   └── register_skills.py       # Register skills to system
+│
+├── docs/                         # Documentation
+│   ├── architecture.md          # Architecture documentation
+│   ├── monitoring_system.md     # Monitoring system guide
+│   └── cli_guide.md             # CLI usage guide
+│
+└── data/                         # Data directory (runtime, not in git)
+    ├── raw/                     # Raw data storage
+    ├── intelligence.db          # SQLite database
+    └── vectordb/                # ChromaDB vector database
+```
+
+## Directory Responsibilities
+
+### Core Module (`lingnexus/`)
+
+**`lingnexus/agent/` - Agent Management**
+- `react_agent.py`: Unified entry point for agent creation (exposes `create_docx_agent()`, `create_progressive_agent()`)
+- `agent_factory.py`: Internal factory implementation
+- **Design Rule**: User code should only call `react_agent.py`, never `agent_factory.py` directly
+
+**`lingnexus/cli/` - Command-Line Interface**
+- `__main__.py`: CLI main entry point, routes all subcommands
+- `interactive.py`: Interactive chat interface implementation
+- `monitoring.py`: Monitoring commands implementation
+- Usage: `python -m lingnexus.cli [command]`
+
+**`lingnexus/config/` - Configuration**
+- `model_config.py`: Creates Qwen and DeepSeek models via DashScope API
+- `api_keys.py`: Manages API keys (env vars, .env file)
+- `agent_config.py`: Agent configuration parameters
+
+**`lingnexus/scheduler/` - Task Scheduling**
+- `monitoring.py`: Daily monitoring task orchestrator
+  - Loads project config (`projects_monitoring.yaml`)
+  - Coordinates multiple data source scrapers
+  - Cleans and validates data
+  - Saves to three-tier storage
+
+**`lingnexus/storage/` - Three-Tier Storage**
+- `raw.py`: Raw data storage (preserves complete HTML/JSON)
+- `structured.py`: Structured database (SQLAlchemy ORM + SQLite)
+- `vector.py`: Vector database (ChromaDB, optional dependency)
+
+**`lingnexus/utils/` - Utilities**
+- `skill_loader.py`: Implements Claude Skills three-tier progressive disclosure
+- `code_executor.py`: Safe code execution environment
+
+### Skills Directory (`skills/`)
+
+**`skills/external/` - External Skills**
+- Follows Claude Skills official format
+- Document generation, design, testing skills
+- Each skill contains `SKILL.md`, `scripts/`, `references/`, `assets/`
+
+**`skills/internal/` - Internal Skills**
+- Custom-developed skills
+- **intelligence/**: Competitive intelligence monitoring
+  - ClinicalTrials.gov API v2 scraper
+  - CDE website Playwright scraper (anti-detection enhanced)
+
+### Configuration and Examples (`config/`, `examples/`, `tests/`)
+
+**`config/`**
+- `projects_monitoring.yaml`: Defines monitoring projects, keywords, data source priorities
+
+**`examples/`**
+- Complete examples for various use cases
+- Demonstrates best practices
+
+**`tests/`**
+- Unit and integration tests
+- Covers all core functionality
+
+### Scripts and Documentation (`scripts/`, `docs/`)
+
+**`scripts/`**
+- `load_claude_skills.py`: Load external Claude Skills
+- `register_skills.py`: Register skills to system
+- `setup.sh/ps1`: Cross-platform setup scripts
+
+**`docs/`**
+- Detailed architecture, implementation, and usage documentation
+
+### Data Directory (`data/`)
+
+Auto-generated at runtime, not in version control:
+- `raw/`: Raw data (organized by source and date)
+- `intelligence.db`: SQLite structured database
+- `vectordb/`: ChromaDB vector database
+
 ## Common Commands
 
 ### Installation and Setup
@@ -15,10 +162,23 @@ The system now includes a **competitive intelligence monitoring system** for pha
 # Install dependencies
 uv sync
 
+# Install CDE scraper dependencies (if using monitoring system)
+uv add playwright tabulate
+uv run python -m playwright install chromium
+
+# Install vector database (optional, for semantic search)
+uv add chromadb
+
 # Set up API key
 cp .env.example .env
 # Edit .env with your DASHSCOPE_API_KEY
 ```
+
+**Dependencies**:
+- **Required**: agentscope, sqlalchemy, requests
+- **For CDE scraper**: playwright, tabulate
+- **Optional**: chromadb (for semantic search)
+- **Optional**: Node.js (for some skills)
 
 ### Development
 ```bash
@@ -50,7 +210,7 @@ uv run python tests/test_code_executor.py
 uv run python -m lingnexus.cli
 uv run python -m lingnexus.cli chat --model qwen --mode test
 
-# Monitoring System Commands
+# Monitoring System Commands (includes CDE scraper)
 uv run python -m lingnexus.cli monitor              # Monitor all projects
 uv run python -m lingnexus.cli monitor --project "司美格鲁肽"
 uv run python -m lingnexus.cli status               # View monitoring status
@@ -63,6 +223,9 @@ uv run python -m lingnexus.cli search "关键词"
 uv run python examples/docx_agent_example.py
 uv run python examples/progressive_agent_example.py
 uv run python examples/monitoring_example.py
+
+# CDE Scraper (direct execution for debugging)
+python examples/cde_scraper_example.py
 ```
 
 ## Architecture
@@ -228,9 +391,9 @@ db.close()
 ### Unified CLI (Recommended)
 The CLI has been unified with multiple subcommands:
 
-**Monitoring Commands**:
+**Monitoring Commands** (includes CDE scraper):
 ```bash
-python -m lingnexus.cli monitor [--project NAME]     # Execute monitoring
+python -m lingnexus.cli monitor [--project NAME]     # Execute monitoring (triggers CDE scraper)
 python -m lingnexus.cli status                        # View system status
 python -m lingnexus.cli db [--project NAME] [--nct ID]  # Query database
 python -m lingnexus.cli search QUERY [--project NAME]   # Semantic search
@@ -241,6 +404,11 @@ python -m lingnexus.cli search QUERY [--project NAME]   # Semantic search
 python -m lingnexus.cli                      # Default: chat mode
 python -m lingnexus.cli chat [OPTIONS]       # Explicit chat mode
 ```
+
+**CDE Scraper**:
+- **Integrated**: Use `monitor` command to trigger CDE scraper with automatic data storage
+- **Standalone**: Use `python examples/cde_scraper_example.py` for direct debugging
+- CDE scraper requires `headless=False` (shows browser window) to bypass anti-bot detection
 
 ### Interactive Chat Commands
 When in chat mode, these commands (all start with `/`) are available:
@@ -301,14 +469,65 @@ When adding new functionality:
 - Supported formats: `YYYY-MM-DD`, `YYYY-MM`, `YYYY`
 
 **Optional Dependencies**:
-- ChromaDB (vector DB) is optional - system gracefully degrades
-- Always check: `try: from lingnexus.storage.vector import VectorDB`
-- Warn users if optional features unavailable
+- **playwright**: Required for CDE scraper (install with `uv add playwright`)
+- **tabulate**: Required for database query display (install with `uv add tabulate`)
+- **ChromaDB**: Vector database for semantic search (optional, install with `uv add chromadb`)
+  - System gracefully degrades if not installed
+  - Always check: `try: from lingnexus.storage.vector import VectorDB`
+  - Warn users if optional features unavailable
 
 **Configuration File**:
 - Location: `config/projects_monitoring.yaml`
 - Contains project definitions and data source priorities
 - Monitored projects: 司美格鲁肽 (Semaglutide)
+
+## CDE Scraper Usage
+
+### Two Ways to Use CDE Scraper
+
+**Method 1: Through CLI Monitoring System (Recommended)**
+
+```bash
+# Trigger CDE scraper through monitoring system
+uv run python -m lingnexus.cli monitor --project "司美格鲁肽"
+
+# View collected data
+uv run python -m lingnexus.cli db --project "司美格鲁肽"
+```
+
+**Advantages**:
+- Automatically integrated into monitoring workflow
+- Data automatically saved to three-tier storage architecture
+- Supports multi-source coordination
+- Automatic data cleaning and indexing
+- Uses `headless=False` (shows browser window) to bypass anti-bot detection
+
+**Method 2: Direct Script Execution (For Debugging)**
+
+```bash
+# Must use Python directly (not uv run)
+python examples/cde_scraper_example.py
+```
+
+**Important Notes**:
+- CDE scraper requires `headless=False` to bypass anti-bot detection
+- Direct script execution cannot use `uv run` (causes asyncio loop conflict)
+- First run automatically downloads Chromium browser (~150MB)
+
+**Anti-Detection Features**:
+- Disables automation detection flags (`--disable-blink-features=AutomationControlled`)
+- Real browser fingerprints (User-Agent, viewport, timezone, geolocation)
+- JavaScript injection to override `navigator.webdriver`
+- Human behavior simulation (mouse movement, scrolling, random delays)
+- Smart retry mechanism (max 3 attempts)
+- Page content detection (identifies blocked pages)
+
+**Extracted Fields**:
+- Registration number (registration_number)
+- Trial status (status)
+- Drug name (company)
+- Indication (indication)
+- URL link
 
 ## Important Notes
 
@@ -318,9 +537,15 @@ When adding new functionality:
 - **Vector DB**: `data/vectordb/` - ChromaDB (optional, for semantic search)
 - All data directories are excluded from git via `.gitignore`
 
+**Note**: The system gracefully degrades without ChromaDB. Core functionality (data collection, storage, querying) works perfectly without vector database. Only semantic search is unavailable.
+
 ### Testing Monitoring System
 ```bash
-# Test basic monitoring
+# First, install required dependencies
+uv add playwright tabulate
+uv run python -m playwright install chromium
+
+# Test basic monitoring (includes CDE scraper)
 uv run python -m lingnexus.cli monitor --project "司美格鲁肽"
 
 # View results
@@ -328,7 +553,12 @@ uv run python -m lingnexus.cli db --project "司美格鲁肽"
 
 # Check system status
 uv run python -m lingnexus.cli status
+
+# Test CDE scraper directly (for debugging)
+python examples/cde_scraper_example.py
 ```
+
+**Note**: CDE scraper will show browser window (`headless=False`) to bypass anti-bot detection. This is normal behavior.
 
 ### Documentation References
 - **Monitoring System**: `docs/monitoring_system.md` - Complete guide

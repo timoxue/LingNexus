@@ -187,7 +187,8 @@ class DailyMonitoringTask:
 
         try:
             # 使用上下文管理器
-            with CDEScraper(headless=True) as scraper:
+            # 注意：CDE爬虫必须使用 headless=False 才能绕过反爬虫检测
+            with CDEScraper(headless=False) as scraper:
                 for keyword in keywords[:3]:  # 限制最多3个关键词
                     print(f"\n  [CDE] 搜索关键词: {keyword}")
                     trials = scraper.search_trials(keyword, max_results=5)
@@ -203,12 +204,21 @@ class DailyMonitoringTask:
 
             # 保存和索引数据
             for trial in collected_trials:
+                # 字段映射：CDE 使用 registration_number，映射到 nct_id
+                trial_data = trial.copy()
+                if 'registration_number' in trial_data and 'nct_id' not in trial_data:
+                    trial_data['nct_id'] = trial_data['registration_number']
+
+                # 移除不需要保存到数据库的字段
+                trial_data.pop('project', None)  # project 通过 project_id 关联
+                trial_data.pop('registration_number', None)  # 已映射到 nct_id
+
                 self._save_and_index(
                     source="CDE",
                     raw_data=trial.get('raw_detail', trial.get('title', '')),
                     url=trial.get('url', ''),
                     project=project,
-                    extracted_data=trial
+                    extracted_data=trial_data
                 )
 
             return {
@@ -218,6 +228,9 @@ class DailyMonitoringTask:
             }
 
         except Exception as e:
+            import traceback
+            print(f"\n  [CDE] ❌ 错误详情: {e}")
+            print(f"  [CDE] 错误堆栈:\n{traceback.format_exc()}")
             return {
                 "items": collected_trials,
                 "count": len(collected_trials),

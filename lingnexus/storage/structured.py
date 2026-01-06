@@ -214,9 +214,15 @@ class StructuredDB:
         ).first()
 
         if trial:
-            # 更新
+            # 更新 - 只更新模型中存在的字段
+            valid_fields = {
+                'nct_id', 'title', 'company', 'phase', 'status',
+                'indication', 'start_date', 'completion_date',
+                'primary_completion_date', 'enrollment', 'source', 'url'
+            }
+
             for key, value in extracted_data.items():
-                if hasattr(trial, key):
+                if key in valid_fields and hasattr(trial, key):
                     setattr(trial, key, value)
             trial.updated_at = datetime.now()
         else:
