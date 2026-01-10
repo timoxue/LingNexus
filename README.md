@@ -2,102 +2,76 @@
 
 基于 AgentScope 框架构建的多智能体系统，支持 Claude Skills 兼容性，具有竞品情报监控功能，可自动采集医药行业数据。
 
+**架构**: Monorepo 结构，包含 Framework（框架包）和 Platform（低代码平台）两个子项目。
+
 ## 特性
 
+### Framework (lingnexus-framework)
 - **多智能体系统**: 基于 AgentScope 框架构建
 - **Claude Skills 兼容**: 渐进式披露机制，高效管理 Token 使用
 - **竞品情报监控**: 自动从多个数据源采集竞争情报
 - **三层存储架构**: 原始数据、结构化数据库、向量搜索
 - **统一命令行工具**: 单一入口完成所有操作
 
+### Platform (lingnexus-platform)
+- **低代码平台**: 可视化 Skill 和 Agent 编排
+- **Web 界面**: 基于 Vue 3 + FastAPI 的现代化界面
+- **用户管理**: 完整的认证和权限系统
+- **审计日志**: 符合 FDA 21 CFR Part 11 标准
+
 ## 项目结构
 
 ```
 LingNexus/
-├── lingnexus/                    # 核心应用模块
-│   ├── agent/                    # Agent 创建和管理
-│   │   ├── __init__.py
-│   │   ├── agent_factory.py      # Agent 工厂类（内部使用）
-│   │   └── react_agent.py        # 统一 Agent 创建入口（用户接口）
-│   ├── cli/                      # 命令行工具
-│   │   ├── __init__.py
-│   │   ├── __main__.py           # CLI 主入口（路由所有命令）
-│   │   ├── interactive.py        # 交互式对话模式
-│   │   └── monitoring.py         # 监控相关命令（monitor、status、db、search）
-│   ├── config/                   # 配置管理
-│   │   ├── __init__.py
-│   │   ├── agent_config.py       # Agent 配置
-│   │   ├── api_keys.py           # API Key 管理
-│   │   └── model_config.py       # 模型配置（Qwen、DeepSeek）
-│   ├── scheduler/                # 任务调度系统
-│   │   ├── __init__.py
-│   │   └── monitoring.py         # 每日监控任务（协调数据采集和存储）
-│   ├── storage/                  # 三层存储架构
-│   │   ├── __init__.py
-│   │   ├── raw.py                # 原始数据存储（HTML/JSON）
-│   │   ├── structured.py         # 结构化数据库（SQLite + SQLAlchemy）
-│   │   └── vector.py             # 向量数据库（ChromaDB，可选）
-│   ├── utils/                    # 工具模块
-│   │   ├── __init__.py
-│   │   ├── code_executor.py      # 代码执行器
-│   │   └── skill_loader.py       # Skills 加载和注册
-│   └── __init__.py
+├── packages/
+│   ├── framework/                # Framework 包（lingnexus-framework）
+│   │   ├── lingnexus/
+│   │   │   ├── agent/           # Agent 创建和管理
+│   │   │   ├── cli/             # 命令行工具
+│   │   │   ├── config/          # 配置管理
+│   │   │   ├── scheduler/       # 任务调度系统
+│   │   │   ├── storage/         # 三层存储架构
+│   │   │   └── utils/           # 工具模块
+│   │   ├── skills/              # Claude Skills 技能目录
+│   │   ├── examples/            # 使用示例
+│   │   ├── tests/               # Framework 测试
+│   │   └── pyproject.toml       # Framework 包配置
+│   │
+│   └── platform/                 # Platform 包（lingnexus-platform）
+│       ├── backend/             # Platform 后端（FastAPI）
+│       │   ├── api/             # API 路由
+│       │   ├── models/          # 数据模型
+│       │   ├── services/        # 业务逻辑
+│       │   ├── main.py          # FastAPI 应用入口
+│       │   └── pyproject.toml   # Backend 配置
+│       │
+│       └── frontend/            # Platform 前端（Vue 3）
+│           ├── src/
+│           │   ├── components/  # Vue 组件
+│           │   ├── views/       # 页面视图
+│           │   ├── router/      # 路由配置
+│           │   └── stores/      # 状态管理
+│           └── package.json     # Frontend 配置
 │
-├── skills/                       # Claude Skills 技能目录
-│   ├── external/                 # 外部技能（Claude Skills 官方兼容格式）
-│   │   ├── docx/                 # Word 文档生成技能
-│   │   ├── pdf/                 # PDF 处理技能
-│   │   ├── pptx/                # PowerPoint 生成技能
-│   │   ├── xlsx/                # Excel 处理技能
-│   │   ├── frontend-design/     # 前端设计技能
-│   │   ├── canvas-design/       # Canvas 设计技能
-│   │   ├── algorithmic-art/     # 算法艺术技能
-│   │   ├── brand-guidelines/    # 品牌指南技能
-│   │   ├── webapp-testing/      # Web 应用测试技能
-│   │   ├── web-artifacts-builder/ # Web 构件构建技能
-│   │   ├── slack-gif-creator/   # Slack GIF 创建技能
-│   │   ├── theme-factory/       # 主题工厂技能
-│   │   ├── internal-comms/      # 内部沟通技能
-│   │   ├── mcp-builder/         # MCP 构建器技能
-│   │   ├── skill-creator/       # 技能创建器技能
-│   │   └── doc-coauthoring/     # 文档协作技能
-│   └── internal/                 # 内部技能（自定义开发）
-│       ├── docx/                # 内部 DOCX 技能
-│       └── intelligence/        # 情报监控技能
-│           ├── SKILL.md         # 技能说明文档
-│           └── scripts/         # 数据采集脚本
-│               ├── clinical_trials_scraper.py  # ClinicalTrials.gov 爬虫
-│               └── cde_scraper.py              # CDE 网站爬虫
+├── docs/                        # 项目文档
+│   ├── framework/               # Framework 文档
+│   ├── platform/                # Platform 文档
+│   ├── development/             # 开发文档
+│   └── SUMMARY.md               # 文档索引
 │
-├── config/                       # 配置文件目录
+├── scripts/                     # 实用脚本
+│   ├── dev.sh                   # 启动开发环境
+│   ├── test.sh                  # 运行所有测试
+│   └── build.sh                 # 构建所有包
+│
+├── config/                      # 配置文件目录
 │   └── projects_monitoring.yaml # 监控项目配置
 │
-├── examples/                     # 使用示例
-│   ├── docx_agent_example.py           # DOCX Agent 示例
-│   ├── progressive_agent_example.py    # 渐进式 Agent 示例
-│   ├── monitoring_example.py           # 监控系统示例（Python API）
-│   ├── cde_scraper_example.py          # CDE 爬虫示例（直接运行）
-│   ├── studio_example.py               # Studio 集成示例
-│   ├── interactive_test.py             # 交互式测试
-│   ├── alias_usage_example.py          # 别名使用示例
-│   └── README.md                       # 示例说明文档
-│
-├── tests/                        # 测试文件
-│   ├── test_setup.py                  # 环境设置测试
-│   ├── test_api_key.py                # API Key 测试
-│   ├── test_model_creation.py         # 模型创建测试
-│   ├── test_skill_registration.py     # 技能注册测试
-│   ├── test_agent_creation.py         # Agent 创建测试
-│   ├── test_cli.py                    # CLI 测试
-│   ├── test_architecture.py           # 架构测试
-│   ├── test_code_executor.py          # 代码执行器测试
-│   ├── test_skill_execution.py        # 技能执行测试
-│   ├── test_skill_priority.py         # 技能优先级测试
-│   └── README.md                      # 测试说明文档
-│
-├── scripts/                      # 实用脚本
-│   ├── load_claude_skills.py          # 加载 Claude Skills
-│   ├── register_skills.py             # 注册 Skills 到系统
+├── REFACTOR_GUIDE.md            # 重构指南
+├── MIGRATION_GUIDE.md           # 迁移指南
+├── CLAUDE.md                    # Claude Code 指南
+└── README.md                    # 本文件
+```
 │   ├── setup.sh                       # Linux/Mac 安装脚本
 │   └── setup.ps1                      # Windows 安装脚本
 │
