@@ -436,14 +436,314 @@ python examples/cde_scraper_example.py
 - **Architecture**: `docs/development/architecture.md` - Overall system design
 - **CLI Guide**: `docs/cli_guide.md` - Detailed CLI usage
 
-## Platform Development (Future)
+## Platform Development
 
-The Platform package is currently in early development. When working on Platform:
+The Platform package provides a low-code web interface for building and managing AI agents.
 
-- Backend: `packages/platform/backend/` - FastAPI application
-- Frontend: `packages/platform/frontend/` - Vue 3 + TypeScript application
-- Use workspace dependencies: Platform imports from Framework
-- More documentation will be added as Platform matures
+### Platform Structure
+
+```
+packages/platform/
+├── backend/                    # FastAPI Backend
+│   ├── api/
+│   │   └── v1/
+│   │       ├── auth.py         # Authentication endpoints
+│   │       ├── skills.py       # Skills CRUD
+│   │       ├── agents.py       # Agents CRUD & execution
+│   │       ├── monitoring.py   # Monitoring data
+│   │       └── marketplace.py  # Skills Marketplace ⭐
+│   ├── core/
+│   │   ├── security.py         # JWT + password hashing
+│   │   └── deps.py            # Dependencies (auth, etc.)
+│   ├── db/
+│   │   ├── models.py          # SQLAlchemy ORM models
+│   │   └── session.py         # Database session
+│   ├── models/
+│   │   └── schemas.py         # Pydantic schemas
+│   ├── services/
+│   │   └── agent_service.py   # Agent execution service
+│   └── main.py               # FastAPI app entry point
+│
+└── frontend/                   # Vue 3 Frontend
+    ├── src/
+    │   ├── api/              # API clients
+    │   │   ├── client.ts     # Axios configuration
+    │   │   ├── marketplace.ts # Marketplace API ⭐
+    │   │   └── ...
+    │   ├── stores/           # Pinia stores
+    │   │   ├── marketplace.ts # Marketplace store ⭐
+    │   │   └── ...
+    │   ├── views/            # Page components
+    │   │   ├── MarketplaceView.vue ⭐
+    │   │   ├── MarketplaceSkillDetailView.vue ⭐
+    │   │   └── ...
+    │   ├── router/           # Vue Router config
+    │   └── layouts/          # Layout components
+    └── package.json
+```
+
+### Skills Marketplace Features
+
+**Backend API Endpoints** (`/api/v1/marketplace/`):
+
+```python
+# GET /marketplace/skills - List marketplace skills
+# Query params: category, sharing_scope, search, sort_by, department, is_official
+# Returns: List[MarketplaceSkill]
+
+# GET /marketplace/skills/{id} - Get skill details
+# Returns: MarketplaceSkill
+
+# POST /marketplace/skills/{id}/try - Try skill without login
+# Body: { message: str }
+# Returns: TrySkillResponse
+
+# POST /marketplace/skills/{id}/create-agent - Create agent from skill
+# Body: CreateAgentFromSkillRequest
+# Returns: Agent
+
+# POST /marketplace/skills/{id}/save - Save skill to favorites
+# Returns: { message: str }
+
+# DELETE /marketplace/skills/{id}/save - Unsave skill
+# Returns: 204 No Content
+
+# POST /marketplace/skills/{id}/rate - Rate skill
+# Body: { rating: int (1-5), comment?: str }
+# Returns: SkillRating
+
+# GET /marketplace/my/saved - Get user's saved skills
+# Returns: List[MarketplaceSkill]
+```
+
+**Database Models**:
+
+```python
+class User(Base):
+    # Basic: id, username, email, hashed_password, full_name
+    # Status: is_active, is_superuser
+    # Marketplace: department, role (user/admin/super_admin), xp, level
+    # Timestamps: created_at, updated_at
+
+class Skill(Base):
+    # Basic: id, name, category (external/internal), content, meta
+    # Status: is_active, version
+    # Marketplace: sharing_scope (private/team/public), department, is_official
+    # Statistics: usage_count, rating, rating_count
+    # Documentation: documentation
+    # Timestamps: created_at, updated_at
+    # Relations: creator, agent_skills, saved_by, ratings
+
+class SavedSkill(Base):
+    # User's saved skills
+    user_id: int
+    skill_id: int
+    # Unique constraint on (user_id, skill_id)
+
+class SkillRating(Base):
+    # User ratings for skills
+    user_id: int
+    skill_id: int
+    rating: int  # 1-5
+    comment: Optional[str]
+    # Unique constraint on (user_id, skill_id)
+```
+
+**Permission System**:
+
+Access control based on `sharing_scope`:
+
+- **`public`**: Anyone can access (no login required)
+- **`team`**: Only same department users or creator
+- **`private`**: Only creator
+
+### Platform Development Commands
+
+**Backend Development**:
+
+```bash
+cd packages/platform/backend
+
+# Install dependencies
+uv sync
+
+# Run development server
+uv run uvicorn main:app --reload --port 8000
+
+# Run with auto-reload and specific host
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# View API docs
+# Open http://localhost:8000/docs in browser
+```
+
+**Frontend Development**:
+
+```bash
+cd packages/platform/frontend
+
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+### Key Development Guidelines
+
+**Authentication**:
+
+- JWT-based authentication with access tokens
+- Optional authentication for public endpoints
+- Use `get_current_user` for required auth
+- Use `get_current_user_optional` for optional auth
+
+**Permission Checks**:
+
+```python
+def _can_access_skill(skill: Skill, user: Optional[User]) -> bool:
+    # Public skills: everyone
+    if skill.sharing_scope == "public":
+        return True
+
+    # No user: only public
+    if user is None:
+        return False
+
+    # Superuser: everything
+    if user.is_superuser:
+        return True
+
+    # Private: only creator
+    if skill.sharing_scope == "private":
+        return skill.created_by == user.id
+
+    # Team: creator or same department
+    if skill.sharing_scope == "team":
+        return skill.created_by == user.id or skill.department == user.department
+
+    return False
+```
+
+**Agent Execution**:
+
+- Platform connects to Framework's `create_progressive_agent()`
+- Execution service in `services/agent_service.py`
+- Tracks execution history in `AgentExecution` table
+- Returns: status, output_message, error_message, tokens_used, execution_time
+
+### Frontend Architecture
+
+**Vue 3 Composition API**:
+
+```typescript
+// Marketplace Store
+import { useMarketplaceStore } from '@/stores'
+
+const marketplaceStore = useMarketplaceStore()
+
+// Fetch marketplace skills
+await marketplaceStore.fetchMarketplaceSkills({
+  search: 'docx',
+  category: 'external',
+  sort_by: 'rating'
+})
+
+// Try a skill
+await marketplaceStore.tryMarketplaceSkill(skillId, {
+  message: 'Create a Word document'
+})
+
+// Create agent from skill
+await marketplaceStore.createAgentFromSkill(skillId, {
+  agent_name: 'My Docx Agent',
+  model_name: 'qwen-max',
+  temperature: 0.7
+})
+```
+
+**Router Configuration**:
+
+- `/marketplace` - Public access, no login required
+- `/` - Requires authentication
+- Route guards in `router/index.ts`
+
+### Testing Marketplace Features
+
+**Setup Test Data**:
+
+1. Register a user: `POST /api/v1/auth/register`
+2. Login: `POST /api/v1/auth/login`
+3. Create skills with different `sharing_scope`
+4. Test permission-based access
+
+**Test Workflow**:
+
+```bash
+# 1. Start backend
+cd packages/platform/backend
+uv run uvicorn main:app --reload
+
+# 2. Start frontend (new terminal)
+cd packages/platform/frontend
+npm run dev
+
+# 3. Access application
+# Open http://localhost:5173
+# Register/Login → Browse Marketplace → Try Skills → Create Agents
+```
+
+### Platform Framework Integration
+
+**Importing from Framework**:
+
+```python
+# Backend: services/agent_service.py
+from lingnexus.agent import create_progressive_agent
+from lingnexus.config import init_agentscope
+
+# Initialize AgentScope
+init_agentscope()
+
+# Create agent
+agent = create_progressive_agent(
+    model_name="qwen-max",
+    temperature=0.7,
+)
+```
+
+**Workspace Dependencies**:
+
+Platform automatically imports Framework through uv workspace:
+- Changes to Framework are immediately available
+- No need to reinstall packages
+- Shared dependencies managed at root level
+
+### Known Issues and Solutions
+
+**Issue**: bcrypt version incompatibility
+**Solution**: Using SHA256 hashing instead (`core/security.py`)
+
+**Issue**: SQLAlchemy reserved keyword `metadata`
+**Solution**: Renamed to `meta` in Skill model
+
+**Issue**: websockets 15.0 incompatibility
+**Solution**: Downgraded to websockets 12.0
+
+### Future Platform Features
+
+**Planned** (from design document):
+- Workflow Studio (visual orchestration)
+- Team collaboration features
+- Gamification (XP, levels, badges, leaderboards)
+- Intelligent recommendations
+- One-click deployment
+- Audit logs (FDA 21 CFR Part 11 compliant)
+
+See `docs/platform/PLATFORM_FRONTEND_DESIGN.md` for complete design specification.
 
 ## Monorepo Workspace
 

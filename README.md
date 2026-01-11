@@ -19,11 +19,14 @@ LingNexus 采用 **Monorepo 架构**，包含两个核心子项目：
 
 ### 🌐 Platform (`lingnexus-platform`)
 
-低代码可视化平台（开发中）：
+低代码可视化平台：
 
 - **Web 界面**: 基于 Vue 3 + FastAPI 的现代化界面
-- **可视化编排**: 拖拽式 Skill 和 Agent 工作流设计
-- **合规支持**: 符合 FDA 21 CFR Part 11 标准的审计日志
+- **技能市场**: Skills Marketplace 2.0 - 发现、试用、收藏、评分技能
+- **一键创建**: 从技能一键创建 Agent
+- **权限管理**: 支持私有/团队/公开三种共享范围
+- **代理管理**: Agent 配置、执行、历史记录
+- **监控数据**: ClinicalTrials、CDE 等数据可视化
 
 ## 📁 项目结构
 
@@ -97,19 +100,44 @@ uv run python -m lingnexus.cli db --project "司美格鲁肽"
 uv run python -m lingnexus.cli search "GLP-1"
 ```
 
-### 3. 开发 Platform（可选）
+### 3. 使用 Platform
+
+#### 启动服务
 
 ```bash
 # 后端开发
 cd packages/platform/backend
 uv sync
-uv run uvicorn main:app --reload
+uv run uvicorn main:app --reload --port 8000
 
-# 前端开发
+# 前端开发（新终端窗口）
 cd packages/platform/frontend
 npm install
 npm run dev
 ```
+
+访问 `http://localhost:5173` 开始使用 Platform。
+
+#### Platform 功能
+
+**技能市场** (`/marketplace`):
+- 浏览公开技能（无需登录）
+- 搜索、过滤、排序技能
+- 试用技能（立即测试效果）
+- 收藏和评分技能
+- 一键创建 Agent
+
+**代理管理** (`/agents`):
+- 创建和配置 Agent
+- 选择模型（Qwen/DeepSeek）
+- 关联技能
+- 执行 Agent 并查看结果
+- 查看执行历史
+
+**监控数据** (`/monitoring`):
+- 查看临床试验数据
+- CDE 注册信息
+- 数据可视化展示
 
 ## 📚 文档
 
@@ -274,6 +302,28 @@ uv run python -m lingnexus.cli monitor --project "司美格鲁肽"
 3. 创建 API Key
 
 ## 📝 更新日志
+
+### v1.0.0 (2025-01-11)
+
+**Platform 首个功能版本**：
+- ✨ Skills Marketplace 2.0 - 技能市场
+  - 技能浏览、搜索、过滤、排序
+  - 技能详情页
+  - 试用技能（无需登录）
+  - 收藏和评分技能
+  - 一键从技能创建 Agent
+- ✨ 权限管理系统
+  - 私有/团队/公开三种共享范围
+  - 部门隔离
+  - 用户角色和权限
+- ✨ Agent 执行功能
+  - 连接到 Framework 的 Progressive Agent
+  - 实时执行结果展示
+  - 执行历史记录
+- ✨ 完整的前端界面
+  - Vue 3 + TypeScript + Element Plus
+  - Pinia 状态管理
+  - 响应式设计
 
 ### v0.2.0 (2025-01-10)
 
