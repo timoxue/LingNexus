@@ -42,6 +42,10 @@ class UserResponse(UserBase):
     id: int
     is_active: bool
     is_superuser: bool
+    department: Optional[str] = None
+    role: str = "user"
+    xp: int = 0
+    level: int = 1
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -90,6 +94,71 @@ class SkillResponse(SkillBase):
     created_by: int
     created_at: datetime
     updated_at: datetime
+    sharing_scope: str = "private"
+    department: Optional[str] = None
+    is_official: bool = False
+    usage_count: int = 0
+    rating: Optional[float] = None
+    rating_count: int = 0
+    documentation: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SkillUpdate(BaseModel):
+    """更新技能"""
+    content: Optional[str] = None
+    meta: Optional[dict] = None
+    is_active: Optional[bool] = None
+    sharing_scope: Optional[str] = None
+    department: Optional[str] = None
+    is_official: Optional[bool] = None
+    documentation: Optional[str] = None
+
+
+class SkillMarketResponse(SkillResponse):
+    """技能市场响应（包含额外字段）"""
+    creator_name: Optional[str] = None
+    is_saved: bool = False
+    user_rating: Optional[int] = None
+
+
+class TrySkillRequest(BaseModel):
+    """试用技能请求"""
+    message: str = Field(..., min_length=1)
+
+
+class TrySkillResponse(BaseModel):
+    """试用技能响应"""
+    status: str
+    output_message: Optional[str] = None
+    error_message: Optional[str] = None
+    execution_time: Optional[float] = None
+
+
+class CreateAgentFromSkillRequest(BaseModel):
+    """从技能创建代理请求"""
+    agent_name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = None
+    model_name: str = Field(default="qwen-max")
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    max_tokens: Optional[int] = Field(None, gt=0)
+
+
+class RateSkillRequest(BaseModel):
+    """评分请求"""
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = Field(None, max_length=500)
+
+
+class RatingResponse(BaseModel):
+    """评分响应"""
+    id: int
+    user_id: int
+    skill_id: int
+    rating: int
+    comment: Optional[str] = None
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

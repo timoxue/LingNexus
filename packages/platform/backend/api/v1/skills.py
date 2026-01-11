@@ -108,7 +108,7 @@ async def create_skill(
         name=skill_in.name,
         category=skill_in.category,
         content=skill_in.content,
-        metadata=skill_in.metadata,
+        meta=skill_in.meta,
         created_by=current_user.id,
     )
     db.add(skill)

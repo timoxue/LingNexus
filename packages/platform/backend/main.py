@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from db import init_db
-from api.v1 import auth, skills, agents, monitoring
+from api.v1 import auth, skills, agents, monitoring, marketplace
 
 
 @asynccontextmanager
@@ -65,3 +65,4 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(skills.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(monitoring.router, prefix="/api/v1")
+app.include_router(marketplace.router, prefix="/api/v1")

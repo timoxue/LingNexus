@@ -12,8 +12,11 @@ from db.models import User
 from core.security import decode_access_token
 from models.schemas import TokenData
 
-# HTTP Bearer 认证
+# HTTP Bearer 认证（自动模式）
 security = HTTPBearer()
+
+# HTTP Bearer 认证（可选模式）
+security_optional = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
@@ -107,3 +110,44 @@ def get_current_superuser(current_user: User = Depends(get_current_user)) -> Use
             detail="Not enough permissions",
         )
     return current_user
+
+
+def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """
+    获取当前登录用户（可选）
+
+    允许未登录用户访问，但如果有 token 则返回用户信息
+
+    Args:
+        credentials: HTTP Bearer credentials（可选）
+        db: 数据库会话
+
+    Returns:
+        Optional[User]: 当前用户，如果未登录则返回 None
+    """
+    if credentials is None:
+        return None
+
+    token = credentials.credentials
+
+    # 解码 Token
+    payload = decode_access_token(token)
+
+    if payload is None:
+        return None
+
+    user_id: Optional[int] = payload.get("sub")
+
+    if user_id is None:
+        return None
+
+    # 查询用户
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if user is None or not user.is_active:
+        return None
+
+    return user

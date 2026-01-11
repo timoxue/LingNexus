@@ -78,3 +78,4 @@ logs/
 # AgentScope Studio
 agentscope_runs/
 agentscope_logs/
+settings.local.json

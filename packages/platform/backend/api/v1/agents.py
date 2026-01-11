@@ -6,6 +6,7 @@ from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from db.session import get_db
 from db.models import User, Agent, Skill, AgentSkill
