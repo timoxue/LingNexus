@@ -315,28 +315,58 @@ async def execute_agent(
             detail="Agent is not active",
         )
 
-    # TODO: 实际执行代理逻辑
-    # 这里应该调用 lingnexus-framework 的 Agent 执行功能
-    # 目前返回模拟响应
-
+    # 调用 Agent 执行服务
+    from services.agent_service import execute_agent as run_agent
     from db.models import AgentExecution
 
+    # 创建执行记录（状态为 running）
     execution = AgentExecution(
         agent_id=agent.id,
         input_message=execute_request.message,
-        status="success",
-        output_message=f"Simulated response to: {execute_request.message}",
-        tokens_used=100,
-        execution_time=1.5,
+        status="running",
     )
     db.add(execution)
     db.commit()
     db.refresh(execution)
 
-    return AgentExecuteResponse(
-        execution_id=execution.id,
-        status=execution.status,
-        output_message=execution.output_message,
-        tokens_used=execution.tokens_used,
-        execution_time=execution.execution_time,
-    )
+    # 执行 Agent
+    try:
+        result = await run_agent(
+            message=execute_request.message,
+            model_name=agent.model_name,
+            temperature=float(agent.temperature),
+            max_tokens=agent.max_tokens,
+            system_prompt=agent.system_prompt,
+        )
+
+        # 更新执行记录
+        execution.status = result["status"]
+        execution.output_message = result["output_message"]
+        execution.error_message = result["error_message"]
+        execution.tokens_used = result["tokens_used"]
+        execution.execution_time = result["execution_time"]
+        execution.completed_at = func.now()
+        db.commit()
+        db.refresh(execution)
+
+        return AgentExecuteResponse(
+            execution_id=execution.id,
+            status=execution.status,
+            output_message=execution.output_message,
+            error_message=execution.error_message,
+            tokens_used=execution.tokens_used,
+            execution_time=execution.execution_time,
+        )
+
+    except Exception as e:
+        # 执行失败，更新记录
+        execution.status = "failed"
+        execution.error_message = str(e)
+        execution.completed_at = func.now()
+        db.commit()
+        db.refresh(execution)
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Agent execution failed: {str(e)}",
+        )

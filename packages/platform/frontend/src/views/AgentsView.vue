@@ -71,6 +71,75 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 执行对话框 -->
+    <el-dialog
+      v-model="showExecuteDialog"
+      title="执行代理"
+      width="700px"
+    >
+      <div v-if="executingAgent">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="代理名称">{{ executingAgent.name }}</el-descriptions-item>
+          <el-descriptions-item label="模型">{{ executingAgent.model_name }}</el-descriptions-item>
+        </el-descriptions>
+
+        <el-divider />
+
+        <el-form label-width="80px">
+          <el-form-item label="消息">
+            <el-input
+              v-model="executeMessage"
+              type="textarea"
+              :rows="4"
+              placeholder="请输入要发送给代理的消息"
+              :disabled="executing"
+            />
+          </el-form-item>
+        </el-form>
+
+        <el-divider v-if="executeResult" />
+
+        <div v-if="executeResult" class="execute-result">
+          <h4>执行结果</h4>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="状态">
+              <el-tag :type="executeResult.status === 'success' ? 'success' : 'danger'">
+                {{ executeResult.status === 'success' ? '成功' : '失败' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="执行时间">
+              {{ executeResult.execution_time?.toFixed(2) }}秒
+            </el-descriptions-item>
+            <el-descriptions-item label="Token 使用">
+              {{ executeResult.tokens_used }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <div v-if="executeResult.output_message" class="result-content">
+            <h5>输出:</h5>
+            <pre>{{ executeResult.output_message }}</pre>
+          </div>
+
+          <div v-if="executeResult.error_message" class="error-content">
+            <h5>错误:</h5>
+            <pre>{{ executeResult.error_message }}</pre>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="showExecuteDialog = false" :disabled="executing">关闭</el-button>
+        <el-button
+          type="primary"
+          :loading="executing"
+          @click="handleExecute"
+          :disabled="!executeMessage.trim()"
+        >
+          执行
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -88,6 +157,10 @@ const agentsStore = useAgentsStore()
 const formRef = ref<FormInstance>()
 const showCreateDialog = ref(false)
 const editingAgent = ref<Agent | null>(null)
+const showExecuteDialog = ref(false)
+const executingAgent = ref<Agent | null>(null)
+const executeMessage = ref('')
+const executeResult = ref<any>(null)
 
 // 表单数据
 const form = reactive({
@@ -130,7 +203,36 @@ const editAgent = (agent: Agent) => {
 
 // 执行代理
 const executeAgent = (agent: Agent) => {
-  ElMessage.info('执行功能待实现')
+  executingAgent.value = agent
+  executeMessage.value = ''
+  showExecuteDialog.value = true
+}
+
+// 执行代理 - 提交
+const handleExecute = async () => {
+  if (!executeMessage.value.trim()) {
+    ElMessage.warning('请输入执行消息')
+    return
+  }
+
+  executing.value = true
+  try {
+    const result = await agentsStore.executeAgent(executingAgent.value!.id, {
+      message: executeMessage.value,
+    })
+
+    executeResult.value = result
+
+    if (result.status === 'success') {
+      ElMessage.success('执行成功')
+    } else {
+      ElMessage.error('执行失败: ' + (result.error_message || '未知错误'))
+    }
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.detail || '执行失败')
+  } finally {
+    executing.value = false
+  }
 }
 
 // 确认删除
@@ -214,5 +316,38 @@ onMounted(() => {
 
 .table-card {
   margin-bottom: 20px;
+}
+
+.execute-result {
+  margin-top: 20px;
+}
+
+.execute-result h4 {
+  margin: 0 0 15px 0;
+  color: #303133;
+}
+
+.execute-result h5 {
+  margin: 10px 0 5px 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.result-content pre,
+.error-content pre {
+  background-color: #f5f7fa;
+  padding: 12px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.error-content pre {
+  background-color: #fef0f0;
+  color: #f56c6c;
 }
 </style>
