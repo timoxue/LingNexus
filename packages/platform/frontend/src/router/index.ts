@@ -19,6 +19,25 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false },
   },
 
+  // 技能市场（无需登录即可浏览）
+  {
+    path: '/marketplace',
+    name: 'Marketplace',
+    component: () => import('@/layouts/MainLayout.vue'),
+    meta: { requiresAuth: false },
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/MarketplaceView.vue'),
+      },
+      {
+        path: ':id',
+        name: 'MarketplaceSkillDetail',
+        component: () => import('@/views/MarketplaceSkillDetailView.vue'),
+      },
+    ],
+  },
+
   // 主布局路由
   {
     path: '/',

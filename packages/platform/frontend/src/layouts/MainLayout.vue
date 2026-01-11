@@ -12,6 +12,10 @@
         :router="true"
         class="menu"
       >
+        <el-menu-item index="/marketplace">
+          <el-icon><Shop /></el-icon>
+          <template #title>技能市场</template>
+        </el-menu-item>
         <el-menu-item index="/dashboard">
           <el-icon><DataBoard /></el-icon>
           <template #title>仪表板</template>
@@ -76,6 +80,7 @@ import {
   Files,
   User,
   Monitor,
+  Shop,
   Fold,
   Expand,
   UserFilled,
@@ -91,6 +96,7 @@ const isCollapse = ref(false)
 // 当前激活的菜单
 const activeMenu = computed(() => {
   const path = route.path
+  if (path.startsWith('/marketplace')) return '/marketplace'
   if (path.startsWith('/skills')) return '/skills'
   if (path.startsWith('/agents')) return '/agents'
   if (path.startsWith('/monitoring')) return '/monitoring'
