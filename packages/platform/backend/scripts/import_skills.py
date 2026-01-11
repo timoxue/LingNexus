@@ -87,11 +87,12 @@ def import_from_directory(engine, directory: Path, category: str) -> int:
                             pass
 
                 # Build skill data
+                import json
                 skill_data = {
                     "name": skill_path.name,
                     "category": category,
                     "content": skill_content,
-                    "meta": str(meta),  # Convert to string for storage
+                    "meta": json.dumps(meta) if meta else None,  # Convert to JSON string
                     "is_active": True,
                     "version": "1.0.0",
                     "created_by": 1,  # Default user ID
