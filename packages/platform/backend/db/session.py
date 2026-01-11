@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 
 # SQLite database URL (可配置为 PostgreSQL)
-SQLALCHEMY_DATABASE_URL = "sqlite:///./lingnexus_platform.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./lingnexus_platform_new.db"
 
 # 创建引擎
 engine = create_engine(
