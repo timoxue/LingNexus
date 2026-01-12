@@ -1,36 +1,21 @@
 """
 Agent 执行服务
 
-⚠️ 临时方案说明：
+架构说明：
 ==================
-这是一个临时的开发/测试方案，Backend 直接导入并调用 Framework。
+Backend 查询 Agent 绑定的技能列表，传递给 Framework。
+Framework 使用 create_multi_skill_agent() 只加载这些技能。
+Agent 通过 tools (load_skill_instructions) 动态加载技能指令。
 
-优点：
-- 开发快速、调试方便
-- 无网络延迟
-- 适合单机部署
-
-缺点：
-- Backend 无法独立部署
-- 紧耦合，违反微服务原则
-- 无法独立扩展
-- 资源共享，无法隔离
-
-生产环境应该使用：
-- 微服务架构：Framework 作为独立服务
-- 通过 HTTP API 调用
-- 详见：docs/architecture.md
-
-迁移计划：
-- Phase 1: Framework HTTP API
-- Phase 2: Backend HTTP Client
-- Phase 3: 配置开关（direct/http）
-- 详见：docs/architecture.md#未来改进计划
+优势：
+- Agent 只能看到绑定的技能，避免幻觉
+- 按需加载技能指令，节省 tokens
+- 参考 AgentScope 的设计模式
 """
 import asyncio
 import sys
 import io
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 # Windows 编码修复
 if sys.platform == "win32":
@@ -39,12 +24,12 @@ if sys.platform == "win32":
 
 from agentscope.message import Msg
 
-# 导入 framework 模块（⚠️ 临时方案：通过 UV workspace 直接导入）
+# 导入 framework 模块（通过 UV workspace 直接导入）
 try:
     from lingnexus.config import init_agentscope
-    from lingnexus import create_progressive_agent
+    from lingnexus.agent_factory import AgentFactory
     FRAMEWORK_AVAILABLE = True
-    print("[INFO] lingnexus-framework imported successfully (temporary solution)")
+    print("[INFO] lingnexus-framework imported successfully")
 except ImportError as e:
     FRAMEWORK_AVAILABLE = False
     print(f"[ERROR] Failed to import lingnexus-framework: {e}")
@@ -74,6 +59,7 @@ class AgentExecutor:
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
+        skills: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         执行 Agent
@@ -84,6 +70,7 @@ class AgentExecutor:
             temperature: 温度参数
             max_tokens: 最大 token 数
             system_prompt: 系统提示（可选）
+            skills: 绑定的技能列表（可选）
 
         Returns:
             Dict: 执行结果
@@ -115,30 +102,29 @@ class AgentExecutor:
             import time
             start_time = time.time()
 
-            # 创建 Agent
-            agent = create_progressive_agent(
-                model_name=model_name,
-                temperature=temperature,
-                max_tokens=max_tokens or 4096,
-            )
+            # 使用 AgentFactory 创建 Agent
+            factory = AgentFactory()
 
-            # 如果有系统提示，设置到 Agent
-            if system_prompt:
-                # 在自定义系统提示前添加重要指令，防止幻觉
-                enhanced_prompt = """# 重要指令
-
-你必须只使用 available skills 列表中明确列出的技能。不要假设或编造不存在的技能名称（如 "common"）。
-
-""" + system_prompt
-                agent.system_prompt = enhanced_prompt
+            # 如果指定了技能列表，使用 create_multi_skill_agent
+            if skills and len(skills) > 0:
+                print(f"[DEBUG] Creating multi-skill agent with: {skills}")
+                agent = factory.create_multi_skill_agent(
+                    skills=skills,
+                    model_name=model_name,
+                    temperature=temperature,
+                    max_tokens=max_tokens or 4096,
+                    skill_type="external",  # 默认从 external 加载
+                    system_prompt=system_prompt,
+                )
             else:
-                # 如果没有自定义系统提示，添加基础指导
-                agent.system_prompt = """# 重要指令
-
-你必须只使用 available skills 列表中明确列出的技能。不要假设或编造不存在的技能名称（如 "common"）。
-
-请仔细查看 available skills 列表，只使用列表中明确列出的技能名称。
-"""
+                # 没有指定技能，使用 progressive agent（加载所有技能）
+                print(f"[DEBUG] No skills specified, using progressive agent")
+                from lingnexus import create_progressive_agent
+                agent = create_progressive_agent(
+                    model_name=model_name,
+                    temperature=temperature,
+                    max_tokens=max_tokens or 4096,
+                )
 
             # 创建用户消息
             user_msg = Msg(
@@ -197,6 +183,7 @@ async def execute_agent(
     temperature: float = 0.7,
     max_tokens: Optional[int] = None,
     system_prompt: Optional[str] = None,
+    skills: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     执行 Agent 的便捷函数
@@ -207,6 +194,7 @@ async def execute_agent(
         temperature: 温度参数
         max_tokens: 最大 token 数
         system_prompt: 系统提示
+        skills: 要使用的技能列表
 
     Returns:
         Dict: 执行结果
@@ -217,4 +205,5 @@ async def execute_agent(
         temperature=temperature,
         max_tokens=max_tokens,
         system_prompt=system_prompt,
+        skills=skills,
     )

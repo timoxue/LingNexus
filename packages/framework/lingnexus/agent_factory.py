@@ -157,16 +157,51 @@ class AgentFactory:
         
         # 3. 获取技能提示词
         skill_prompt = self.skill_loader.get_skill_prompt()
-        
+
         # 4. 构建系统提示词
         if system_prompt is None:
-            system_prompt = f"""你是一个多功能的 AI 助手，支持以下技能：{', '.join(skills)}。
+            system_prompt = f"""# 你的角色
+
+你是一个专业的 AI 助手，专门使用以下技能来完成任务：
+
+**可用技能列表**: {', '.join(skills)}
+
+# 重要约束
+
+1. **只使用列出的技能**：你只能使用上述明确列出的技能，不要假设或尝试使用其他技能
+2. **按需加载指令**：使用 `load_skill_instructions(skill_name)` 工具来加载技能的完整使用说明
+3. **不要编造技能**：如果某个技能不在列表中，说明它不可用，不要假设它的存在
+
+# 工作流程
+
+1. 分析用户需求
+2. 从可用技能列表中选择最合适的技能
+3. 使用 `load_skill_instructions(skill_name)` 加载技能的完整说明
+4. 根据技能说明执行任务（可能需要调用 scripts 或使用其他工具）
+5. 返回执行结果
+
+# 可用工具
+
+- `load_skill_instructions(skill_name)`: 加载技能的完整说明（SKILL.md）
+- `list_available_skills()`: 查看所有可用技能
+- 其他工具：根据加载的技能说明，可能会有专门的工具
 
 """
-        
+
+        else:
+            # 如果用户提供了自定义 system_prompt，在其前面添加技能列表信息
+            system_prompt = f"""# 可用技能
+
+你当前可以使用以下技能：{', '.join(skills)}
+
+**重要**: 只能使用上述列出的技能，不要假设或使用其他技能。
+
+{system_prompt}
+"""
+
         if skill_prompt:
             system_prompt += f"\n{skill_prompt}\n"
-        
+
         system_prompt += "\n请根据用户的需求，选择合适的技能来完成任务。"
         
         # 5. 创建 Agent

@@ -318,7 +318,20 @@ async def execute_agent(
 
     # 调用 Agent 执行服务
     from services.agent_service import execute_agent as run_agent
-    from db.models import AgentExecution
+    from db.models import AgentExecution, AgentSkill, Skill
+
+    # 查询 Agent 绑定的技能列表
+    agent_skills_query = db.query(
+        Skill.name, Skill.category
+    ).join(
+        AgentSkill, AgentSkill.skill_id == Skill.id
+    ).filter(
+        AgentSkill.agent_id == agent.id,
+        AgentSkill.enabled == True
+    ).all()
+
+    bound_skills = [skill_name for (skill_name, _) in agent_skills_query]
+    print(f"[DEBUG] Agent '{agent.name}' 绑定的技能: {bound_skills}")
 
     # 创建执行记录（状态为 running）
     execution = AgentExecution(
@@ -335,6 +348,7 @@ async def execute_agent(
         print(f"[DEBUG] 开始执行 Agent: {agent.name}")
         print(f"[DEBUG] 消息: {execute_request.message}")
         print(f"[DEBUG] 模型: {agent.model_name}, 温度: {agent.temperature}")
+        print(f"[DEBUG] 绑定技能: {bound_skills}")
 
         result = await run_agent(
             message=execute_request.message,
@@ -342,6 +356,7 @@ async def execute_agent(
             temperature=float(agent.temperature),
             max_tokens=agent.max_tokens,
             system_prompt=agent.system_prompt,
+            skills=bound_skills if bound_skills else None,  # 传递技能列表
         )
 
         print(f"[DEBUG] Agent 执行完成，状态: {result.get('status')}")
