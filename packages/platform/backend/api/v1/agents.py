@@ -348,7 +348,20 @@ async def execute_agent(
 
         # 更新执行记录
         execution.status = result["status"]
-        execution.output_message = result["output_message"]
+
+        # 处理 output_message：可能是字符串、列表或字典
+        output_msg = result["output_message"]
+        if isinstance(output_msg, list):
+            # 如果是列表，转换为字符串
+            execution.output_message = str(output_msg)
+        elif isinstance(output_msg, dict):
+            # 如果是字典，转换为 JSON 字符串
+            import json
+            execution.output_message = json.dumps(output_msg, ensure_ascii=False)
+        else:
+            # 其他类型（包括字符串）直接赋值
+            execution.output_message = output_msg
+
         execution.error_message = result["error_message"]
         execution.tokens_used = result["tokens_used"]
         execution.execution_time = result["execution_time"]
