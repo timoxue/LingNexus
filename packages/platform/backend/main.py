@@ -50,6 +50,26 @@ async def lifespan(app: FastAPI):
     """
     # 启动时初始化数据库
     init_db()
+
+    # 显示启动信息和 AgentScope Studio 地址
+    studio_enabled = os.getenv("AGENTSCOPE_STUDIO_ENABLED", "true").lower() == "true"
+    logger.info("=" * 60)
+    logger.info("LingNexus Platform Backend Started")
+    logger.info("=" * 60)
+    logger.info("API Documentation: http://localhost:8000/docs")
+    logger.info("API Redoc:        http://localhost:8000/redoc")
+
+    if studio_enabled:
+        logger.info("")
+        logger.info("AgentScope Studio: http://localhost:3000")
+        logger.info("  Studio 会自动在第一次 agent 调用时启动")
+        logger.info("  你可以在浏览器中打开 Studio 查看 agent 执行过程")
+    else:
+        logger.info("")
+        logger.info("AgentScope Studio: Disabled (set AGENTSCOPE_STUDIO_ENABLED=true to enable)")
+
+    logger.info("=" * 60)
+
     yield
     # 关闭时的清理工作（如果有）
 
@@ -196,3 +216,27 @@ app.include_router(skills.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(monitoring.router, prefix="/api/v1")
 app.include_router(marketplace.router, prefix="/api/v1")
+
+if __name__ == "__main__":
+    import uvicorn
+
+    studio_enabled = os.getenv("AGENTSCOPE_STUDIO_ENABLED", "true").lower() == "true"
+
+    print("=" * 70)
+    print("Starting LingNexus Platform Backend")
+    print("=" * 70)
+    print()
+    print(f"Backend API:     http://localhost:8000")
+    print(f"API Docs:       http://localhost:8000/docs")
+    print()
+
+    if studio_enabled:
+        print(f"AgentScope Studio: http://localhost:3000")
+        print("  Studio will start automatically on first agent call")
+        print("  Open this URL in your browser to view agent execution")
+        print()
+
+    print("=" * 70)
+    print()
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -71,18 +71,16 @@ def import_from_directory(engine, directory: Path, category: str) -> int:
                 continue
 
             try:
-                # Read skill file
-                content = skill_md.read_text(encoding="utf-8")
+                # Read skill file (full content, including YAML front matter)
+                full_content = skill_md.read_text(encoding="utf-8")
 
-                # Parse YAML front matter
+                # Parse YAML front matter (for meta field, but keep full content)
                 meta = {}
-                skill_content = content
-                if content.startswith("---"):
-                    parts = content.split("---", 2)
+                if full_content.startswith("---"):
+                    parts = full_content.split("---", 2)
                     if len(parts) >= 3:
                         try:
                             meta = yaml.safe_load(parts[1]) or {}
-                            skill_content = parts[2].strip()
                         except:
                             pass
 
@@ -91,7 +89,7 @@ def import_from_directory(engine, directory: Path, category: str) -> int:
                 skill_data = {
                     "name": skill_path.name,
                     "category": category,
-                    "content": skill_content,
+                    "content": full_content,  # Store full content with YAML front matter
                     "meta": json.dumps(meta) if meta else None,  # Convert to JSON string
                     "is_active": True,
                     "version": "1.0.0",

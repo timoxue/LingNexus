@@ -181,12 +181,34 @@ class AgentExecution(Base):
 
     # 关系
     agent: Mapped["Agent"] = relationship("Agent", back_populates="executions")
+    execution_skills: Mapped[list["AgentExecutionSkill"]] = relationship(
+        "AgentExecutionSkill", back_populates="execution", cascade="all, delete-orphan"
+    )
 
     # 索引
     __table_args__ = (
         Index("idx_agent_status", "agent_id", "status"),
         Index("idx_created_at", "created_at"),
     )
+
+
+class AgentExecutionSkill(Base):
+    """代理执行时使用的技能记录表"""
+    __tablename__ = "agent_execution_skills"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agent_execution_id: Mapped[int] = mapped_column(Integer, ForeignKey("agent_executions.id"), nullable=False)
+    skill_id: Mapped[int] = mapped_column(Integer, ForeignKey("skills.id"), nullable=False)
+    tool_calls: Mapped[Optional[dict]] = mapped_column(JSON)  # 记录调用了哪些工具 {tool_name: call_count}
+    success: Mapped[bool] = mapped_column(Boolean, default=True)  # 该skill的调用是否成功
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+    # 关系
+    execution: Mapped["AgentExecution"] = relationship("AgentExecution", back_populates="execution_skills")
+    skill: Mapped["Skill"] = relationship("Skill")
+
+    # 唯一约束：同一个execution和skill的组合只能有一条记录
+    __table_args__ = (Index("idx_execution_skill", "agent_execution_id", "skill_id", unique=True),)
 
 
 class MonitoringProject(Base):

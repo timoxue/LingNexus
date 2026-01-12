@@ -137,18 +137,16 @@ class SkillSyncService:
         Returns:
             "created", "updated", or "skipped"
         """
-        # 读取技能文件
-        content = skill_md.read_text(encoding="utf-8")
+        # 读取技能文件（完整内容，包括YAML front matter）
+        full_content = skill_md.read_text(encoding="utf-8")
 
-        # 解析 YAML front matter
+        # 解析 YAML front matter（用于 meta 字段，但content保留完整内容）
         meta = {}
-        skill_content = content
-        if content.startswith("---"):
-            parts = content.split("---", 2)
+        if full_content.startswith("---"):
+            parts = full_content.split("---", 2)
             if len(parts) >= 3:
                 try:
                     meta = yaml.safe_load(parts[1]) or {}
-                    skill_content = parts[2].strip()
                 except:
                     pass
 
@@ -160,8 +158,8 @@ class SkillSyncService:
             if not force_update:
                 return "skipped"
 
-            # 更新现有技能
-            existing_skill.content = skill_content
+            # 更新现有技能（保留完整的SKILL.md，包括YAML front matter）
+            existing_skill.content = full_content  # 存储完整内容
             existing_skill.meta = meta if meta else None  # Store dict directly, not JSON string!
             existing_skill.category = category
             existing_skill.updated_at = datetime.utcnow()
@@ -170,11 +168,11 @@ class SkillSyncService:
             return "updated"
 
         else:
-            # 创建新技能
+            # 创建新技能（保留完整的SKILL.md，包括YAML front matter）
             skill = Skill(
                 name=skill_name,
                 category=category,
-                content=skill_content,
+                content=full_content,  # 存储完整内容
                 meta=meta if meta else None,  # Store dict directly, not JSON string!
                 is_active=True,
                 version="1.0.0",

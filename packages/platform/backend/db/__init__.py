@@ -2,7 +2,7 @@
 Database module
 """
 
-from .models import Base, User, Skill, Agent, AgentSkill, AgentExecution, MonitoringProject, ClinicalTrial
+from .models import Base, User, Skill, Agent, AgentSkill, AgentExecution, AgentExecutionSkill, MonitoringProject, ClinicalTrial
 from .session import engine, SessionLocal, get_db, init_db
 
 __all__ = [
@@ -12,6 +12,7 @@ __all__ = [
     "Agent",
     "AgentSkill",
     "AgentExecution",
+    "AgentExecutionSkill",
     "MonitoringProject",
     "ClinicalTrial",
     "engine",

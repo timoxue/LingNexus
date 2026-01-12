@@ -22,13 +22,19 @@ from .utils.skill_loader import SkillLoader
 class AgentFactory:
     """创建配置好的 ReActAgent 实例"""
     
-    def __init__(self, skills_base_dir: str | Path = "skills"):
+    def __init__(self, skills_base_dir: str | Path = None):
         """
         初始化 Agent 工厂
-        
+
         Args:
-            skills_base_dir: Skills 基础目录路径
+            skills_base_dir: Skills 基础目录路径，默认为 framework/skills
         """
+        if skills_base_dir is None:
+            # 默认使用 framework 目录下的 skills
+            current_file = Path(__file__)
+            framework_dir = current_file.parent.parent
+            skills_base_dir = framework_dir / "skills"
+
         self.skill_loader = SkillLoader(skills_base_dir)
     
     def create_docx_agent(

@@ -22,7 +22,7 @@ except ImportError:
         pass
 
 
-def create_new_docx(filename: str = "document.docx") -> str:
+def create_new_docx(filename: str = "document.docx"):
     """
     创建一个新的空 Word 文档 (.docx)
 
@@ -30,7 +30,7 @@ def create_new_docx(filename: str = "document.docx") -> str:
         filename: 文件名，例如 "erp.docx" 或 "document.docx"
 
     Returns:
-        str: 成功消息和文件路径
+        ToolResponse: 成功消息和文件路径
 
     Example:
         >>> result = create_new_docx("erp.docx")
@@ -53,7 +53,7 @@ def create_new_docx(filename: str = "document.docx") -> str:
             from docx import Document
             doc = Document()
             doc.save(output_path)
-            return f"✓ 成功创建空 Word 文档: {output_path}"
+            return ToolResponse(f"成功创建空 Word 文档: {output_path}")
         except ImportError:
             # 方法 2: 使用 python-docx 模块
             pass
@@ -121,13 +121,13 @@ def create_new_docx(filename: str = "document.docx") -> str:
             docx.writestr('word/_rels/document.xml.rels', document_rels)
             docx.writestr('word/styles.xml', styles)
 
-        return f"✓ 成功创建空 Word 文档: {output_path}\n文件已保存在当前工作目录"
+        return ToolResponse(f"成功创建空 Word 文档: {output_path}\n文件已保存在当前工作目录")
 
     except Exception as e:
-        return f"✗ 创建文档失败: {str(e)}"
+        return ToolResponse(f"创建文档失败: {str(e)}", error=True)
 
 
-def create_docx_with_text(filename: str, text_content: str = "") -> str:
+def create_docx_with_text(filename: str, text_content: str = ""):
     """
     创建一个包含文本内容的 Word 文档
 
@@ -136,7 +136,7 @@ def create_docx_with_text(filename: str, text_content: str = "") -> str:
         text_content: 文档内容（纯文本）
 
     Returns:
-        str: 成功消息和文件路径
+        ToolResponse: 成功消息和文件路径
     """
     try:
         from docx import Document
@@ -151,35 +151,36 @@ def create_docx_with_text(filename: str, text_content: str = "") -> str:
             doc.add_paragraph(text_content)
 
         doc.save(output_path)
-        return f"✓ 成功创建 Word 文档: {output_path}\n内容: '{text_content[:50]}...' if len(text_content) > 50 else text_content"
+        preview = text_content[:50] + '...' if len(text_content) > 50 else text_content
+        return ToolResponse(f"成功创建 Word 文档: {output_path}\n内容: '{preview}'")
 
     except ImportError:
-        return "✗ python-docx 库未安装，请运行: pip install python-docx"
+        return ToolResponse("python-docx 库未安装，请运行: pip install python-docx", error=True)
     except Exception as e:
-        return f"✗ 创建文档失败: {str(e)}"
+        return ToolResponse(f"创建文档失败: {str(e)}", error=True)
 
 
-def list_docx_files() -> str:
+def list_docx_files():
     """
     列出当前目录中的所有 .docx 文件
 
     Returns:
-        str: 文件列表
+        ToolResponse: 文件列表
     """
     try:
         docx_files = list(Path.cwd().glob("*.docx"))
         if not docx_files:
-            return "当前目录中没有 .docx 文件"
+            return ToolResponse("当前目录中没有 .docx 文件")
 
         result = "当前目录中的 .docx 文件:\n"
         for f in sorted(docx_files):
             size = f.stat().st_size
             result += f"  - {f.name} ({size} bytes)\n"
 
-        return result.strip()
+        return ToolResponse(result.strip())
 
     except Exception as e:
-        return f"✗ 列出文件失败: {str(e)}"
+        return ToolResponse(f"列出文件失败: {str(e)}", error=True)
 
 
 # 测试代码

@@ -698,6 +698,71 @@ npm run dev
 
 ### Platform Framework Integration
 
+**Skills Complete Loop**:
+
+The Platform implements a complete skills lifecycle from database to execution:
+
+```
+Skills Marketplace (Framework SKILL.md files)
+    ↓ import_skills.py / skill_sync.py
+Database (skills table with full content including YAML)
+    ↓ agents.py queries complete configuration
+agent_service.py (SkillRegistry creates temp files)
+    ↓ AgentScope Toolkit.register_agent_skill()
+AgentScope Toolkit (register_tool_function from tools.py)
+    ↓ TrackedToolkit.call_tool_function()
+Actual Tool Execution (Python code runs)
+    ↓ Files created, results returned
+Database (AgentExecutionSkill records usage)
+    ↓ usage_count incremented
+Statistics & Analytics
+```
+
+**Key Components**:
+
+1. **SkillRegistry** (`services/agent_service.py`):
+   - Loads skills from database (complete SKILL.md content)
+   - Creates temporary skill directories
+   - Registers to AgentScope Toolkit
+   - Dynamically loads tools.py functions
+   - Cleans up temp files after execution
+
+2. **TrackedToolkit** (`services/agent_service.py`):
+   - Wraps AgentScope Toolkit to monitor tool calls
+   - Records all tool invocations (name, arguments)
+   - Maps tool calls to skills
+   - Returns `used_skills` data structure
+
+3. **Database Models** (`db/models.py`):
+   - `skills`: Stores complete SKILL.md content (including YAML)
+   - `agent_execution_skills`: Records which skills were actually used
+   - Tracks tool calls per skill: `{tool_name: call_count}`
+
+**Critical Implementation Details**:
+
+- **YAML Front Matter**: Must be preserved in database
+  - `skill.content` stores full SKILL.md (with `---` delimiters)
+  - `skill.meta` stores parsed YAML data separately
+  - Tool registration requires complete YAML front matter
+
+- **Tool Function Registration**:
+  - Dynamic loading via `importlib.util`
+  - Functions must return `ToolResponse` (not strings)
+  - Filters out system modules (builtins, inspect, etc.)
+  - Only registers functions defined in the skill module
+
+- **Usage Statistics**:
+  - `usage_count` only increments when skill is **actually used**
+  - Check `agent_execution_skills` table to verify
+  - Agent may "know" about skill but not call it
+
+**For detailed architecture documentation**, see:
+- `packages/platform/backend/docs/SKILL_ARCHITECTURE.md` - Complete skills loop documentation
+- `packages/platform/backend/docs/YAML_FIX_GUIDE.md` - YAML front matter troubleshooting
+- `docs/architecture.md` - Platform/Framework architecture analysis
+
+### Platform Framework Integration (Legacy)
+
 **⚠️ Current Architecture (Temporary Solution)**:
 
 The Platform currently uses a **temporary direct-import approach** where the Backend directly imports Framework code:

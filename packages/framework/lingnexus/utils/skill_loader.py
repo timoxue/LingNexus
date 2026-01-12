@@ -31,27 +31,28 @@ class SkillLoader:
 
     def _resolve_skill_type(self, skill_name: str, skill_type: str = "external") -> str:
         """
-        解析技能类型（优先级检查：internal > external）
-
-        如果指定了 skill_type，直接使用。
-        如果 skill_type 为 "external" 或未指定，会先检查 internal 目录是否存在该技能。
+        解析技能类型
 
         Args:
             skill_name: 技能名称
             skill_type: 技能类型（"external", "internal", 或 "auto"）
+                        - "external": 强制使用 external 目录
+                        - "internal": 强制使用 internal 目录
+                        - "auto": 自动检测（优先 internal，其次 external）
 
         Returns:
             实际使用的技能类型（"internal" 或 "external"）
         """
-        if skill_type == "internal":
-            return "internal"
+        # 如果明确指定了类型，直接使用
+        if skill_type in ["internal", "external"]:
+            return skill_type
 
-        # 检查 internal 目录是否存在该技能
+        # auto 模式：优先检查 internal 目录
         internal_path = self.skills_base_dir / "internal" / skill_name
         if internal_path.exists() and (internal_path / "SKILL.md").exists():
             return "internal"
 
-        return skill_type  # 默认返回 external
+        return "external"  # 默认使用 external
     
     def load_skill(self, skill_name: str, skill_type: str = "external") -> Dict:
         """
@@ -119,40 +120,46 @@ class SkillLoader:
 
             # 2. 尝试自动发现并注册 tools.py 中的工具函数
             tools_file = Path(skill_info['path']) / "scripts" / "tools.py"
+
             if tools_file.exists():
-                print(f"[DEBUG] 发现工具文件: {tools_file}")
                 try:
                     # 动态导入 tools 模块
                     import importlib.util
                     spec = importlib.util.spec_from_file_location("skill_tools", tools_file)
+
                     if spec and spec.loader:
                         tools_module = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(tools_module)
 
-                        # 查找所有用 @tool 装饰的函数
+                        # 查找所有工具函数（排除导入的类型和类）
+                        import inspect
                         tool_functions = []
                         for attr_name in dir(tools_module):
                             attr = getattr(tools_module, attr_name)
-                            # 检查是否是函数且有 tool 装饰器标记
-                            if callable(attr) and hasattr(attr, '__name__'):
-                                # 跳过私有函数和特殊方法
-                                if not attr_name.startswith('_'):
-                                    # 注册工具函数
+                            # 检查是否是函数（不是类）
+                            if inspect.isfunction(attr) and not attr_name.startswith('_'):
+                                # 检查 __module__ 属性来排除内置函数和导入的函数
+                                attr_module = getattr(attr, '__module__', None)
+                                # 排除内置模块和标准库模块
+                                if attr_module and not attr_module.startswith('_') and attr_module not in ['builtins', 'inspect', 'importlib', 'importlib.util', 'pathlib', 'typing', 'io', 'zipfile']:
                                     try:
                                         self.toolkit.register_tool_function(attr)
                                         tool_functions.append(attr_name)
-                                        print(f"[DEBUG] 注册工具: {attr_name}")
                                     except Exception as e:
-                                        print(f"[WARN] 注册工具 {attr_name} 失败: {e}")
+                                        import logging
+                                        logging.warning(f"Failed to register tool {attr_name}: {e}")
 
                         if tool_functions:
-                            print(f"[INFO] 技能 '{skill_name}' 注册了 {len(tool_functions)} 个工具: {tool_functions}")
+                            import logging
+                            logging.info(f"Skill '{skill_name}' registered {len(tool_functions)} tools: {tool_functions}")
                 except Exception as e:
-                    print(f"[WARN] 导入工具文件失败: {e}")
+                    import logging
+                    logging.warning(f"Failed to import tools from {tools_file}: {e}")
 
             return True
         except Exception as e:
-            print(f"❌ 注册技能 {skill_name} 失败: {e}")
+            import logging
+            logging.error(f"Failed to register skill '{skill_name}': {e}")
             return False
     
     def register_skills(self, skill_names: List[str], skill_type: str = "external") -> int:

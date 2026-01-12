@@ -2,14 +2,17 @@
 代理管理 API 端点
 """
 import time
+import logging
 from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from db.session import get_db
-from db.models import User, Agent, Skill, AgentSkill, AgentExecution
+from db.models import User, Agent, Skill, AgentSkill, AgentExecution, AgentExecutionSkill
 from core.deps import get_current_active_user
 from models.schemas import AgentCreate, AgentUpdate, AgentResponse, AgentExecute, AgentExecuteResponse, ExecutionResponse
 
@@ -46,24 +49,8 @@ async def list_agents(
 
     result = []
     for agent in agents:
-        # 加载关联的技能
         agent_dict = AgentResponse.model_validate(agent).model_dump()
-        agent_skills = db.query(AgentSkill).filter(
-            AgentSkill.agent_id == agent.id,
-            AgentSkill.enabled == True
-        ).all()
-
-        skills = []
-        for agent_skill in agent_skills:
-            skill = db.query(Skill).filter(Skill.id == agent_skill.skill_id).first()
-            if skill:
-                skills.append({
-                    "id": skill.id,
-                    "name": skill.name,
-                    "category": skill.category,
-                })
-
-        agent_dict["skills"] = skills
+        agent_dict["skills"] = _load_agent_skills(db, agent.id)
         result.append(agent_dict)
 
     return result
@@ -95,24 +82,8 @@ async def get_agent(
             detail="Agent not found",
         )
 
-    # 加载关联的技能
     agent_dict = AgentResponse.model_validate(agent).model_dump()
-    agent_skills = db.query(AgentSkill).filter(
-        AgentSkill.agent_id == agent.id,
-        AgentSkill.enabled == True
-    ).all()
-
-    skills = []
-    for agent_skill in agent_skills:
-        skill = db.query(Skill).filter(Skill.id == agent_skill.skill_id).first()
-        if skill:
-            skills.append({
-                "id": skill.id,
-                "name": skill.name,
-                "category": skill.category,
-            })
-
-    agent_dict["skills"] = skills
+    agent_dict["skills"] = _load_agent_skills(db, agent.id)
 
     return agent_dict
 
@@ -318,20 +289,33 @@ async def execute_agent(
 
     # 调用 Agent 执行服务
     from services.agent_service import execute_agent as run_agent
-    from db.models import AgentExecution, AgentSkill, Skill
+    from db.models import AgentExecution, AgentSkill, Skill, AgentExecutionSkill
 
-    # 查询 Agent 绑定的技能列表
+    # 查询 Agent 绑定的技能列表（完整配置）
     agent_skills_query = db.query(
-        Skill.name, Skill.category
+        Skill.id, Skill.name, Skill.category, Skill.content
     ).join(
         AgentSkill, AgentSkill.skill_id == Skill.id
     ).filter(
         AgentSkill.agent_id == agent.id,
-        AgentSkill.enabled == True
+        AgentSkill.enabled == True,
+        Skill.is_active == True
     ).all()
 
-    bound_skills = [skill_name for (skill_name, _) in agent_skills_query]
-    print(f"[DEBUG] Agent '{agent.name}' 绑定的技能: {bound_skills}")
+    # 构建技能配置列表（传递完整对象）
+    bound_skills = [
+        {
+            "id": skill_id,
+            "name": skill_name,
+            "category": skill_category,
+            "content": skill_content,
+        }
+        for skill_id, skill_name, skill_category, skill_content in agent_skills_query
+    ]
+
+    print(f"[INFO] Agent '{agent.name}' bound {len(bound_skills)} skills from database")
+    for skill in bound_skills:
+        print(f"  - {skill['name']} ({skill['category']})")
 
     # 创建执行记录（状态为 running）
     execution = AgentExecution(
@@ -345,10 +329,8 @@ async def execute_agent(
 
     # 执行 Agent
     try:
-        print(f"[DEBUG] 开始执行 Agent: {agent.name}")
-        print(f"[DEBUG] 消息: {execute_request.message}")
-        print(f"[DEBUG] 模型: {agent.model_name}, 温度: {agent.temperature}")
-        print(f"[DEBUG] 绑定技能: {bound_skills}")
+        print(f"[INFO] Executing agent '{agent.name}' with message: {execute_request.message[:50]}...")
+        print(f"[INFO] Model: {agent.model_name}, Temperature: {agent.temperature}")
 
         result = await run_agent(
             message=execute_request.message,
@@ -356,10 +338,10 @@ async def execute_agent(
             temperature=float(agent.temperature),
             max_tokens=agent.max_tokens,
             system_prompt=agent.system_prompt,
-            skills=bound_skills if bound_skills else None,  # 传递技能列表
+            skills=bound_skills if bound_skills else None,  # 传递完整技能配置
         )
 
-        print(f"[DEBUG] Agent 执行完成，状态: {result.get('status')}")
+        print(f"[INFO] Agent execution completed, status: {result.get('status')}")
 
         # 更新执行记录
         execution.status = result["status"]
@@ -381,6 +363,15 @@ async def execute_agent(
         execution.tokens_used = result["tokens_used"]
         execution.execution_time = result["execution_time"]
         execution.completed_at = func.now()
+
+        # 记录实际使用的 Skills
+        used_skills = result.get("used_skills", {})
+        _record_skill_usage(db, execution, used_skills)
+
+        # 更新 Skills 使用统计
+        if result["status"] == "success" and bound_skills:
+            _update_skill_statistics(db, bound_skills, used_skills)
+
         db.commit()
         db.refresh(execution)
 
@@ -515,4 +506,51 @@ async def get_agent_execution(
         )
 
     return ExecutionResponse.model_validate(execution)
+
+
+def _load_agent_skills(db: Session, agent_id: int) -> list[dict]:
+    """加载 Agent 关联的技能列表"""
+    agent_skills = db.query(AgentSkill).filter(
+        AgentSkill.agent_id == agent_id,
+        AgentSkill.enabled == True
+    ).all()
+
+    skills = []
+    for agent_skill in agent_skills:
+        skill = db.query(Skill).filter(Skill.id == agent_skill.skill_id).first()
+        if skill:
+            skills.append({
+                "id": skill.id,
+                "name": skill.name,
+                "category": skill.category,
+            })
+
+    return skills
+
+
+def _record_skill_usage(db: Session, execution: AgentExecution, used_skills: dict):
+    """记录实际使用的 Skills 到数据库"""
+    if not used_skills:
+        return
+
+    logger.info(f"Recording {len(used_skills)} skill usage records")
+    for skill_id, skill_data in used_skills.items():
+        execution_skill = AgentExecutionSkill(
+            agent_execution_id=execution.id,
+            skill_id=skill_id,
+            tool_calls=skill_data.get('tool_calls', {}),
+            success=True,
+        )
+        db.add(execution_skill)
+        logger.debug(f"  - Skill ID {skill_id}: {skill_data.get('tool_calls', {})}")
+
+
+def _update_skill_statistics(db: Session, bound_skills: list[dict], used_skills: dict):
+    """更新 Skills 使用统计"""
+    for skill in bound_skills:
+        if skill["id"] in used_skills:
+            skill_obj = db.query(Skill).filter(Skill.id == skill["id"]).first()
+            if skill_obj:
+                skill_obj.usage_count = (skill_obj.usage_count or 0) + 1
+                logger.info(f"Updated usage count for skill '{skill_obj.name}': {skill_obj.usage_count}")
 
