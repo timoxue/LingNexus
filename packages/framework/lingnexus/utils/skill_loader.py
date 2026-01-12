@@ -103,17 +103,53 @@ class SkillLoader:
     def register_skill(self, skill_name: str, skill_type: str = "external") -> bool:
         """
         注册技能到 Toolkit
-        
+
         Args:
             skill_name: 技能名称
             skill_type: 技能类型
-        
+
         Returns:
             是否注册成功
         """
         try:
             skill_info = self.load_skill(skill_name, skill_type)
+
+            # 1. 注册 SKILL.md 内容到 prompt
             self.toolkit.register_agent_skill(skill_dir=skill_info['path'])
+
+            # 2. 尝试自动发现并注册 tools.py 中的工具函数
+            tools_file = Path(skill_info['path']) / "scripts" / "tools.py"
+            if tools_file.exists():
+                print(f"[DEBUG] 发现工具文件: {tools_file}")
+                try:
+                    # 动态导入 tools 模块
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location("skill_tools", tools_file)
+                    if spec and spec.loader:
+                        tools_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(tools_module)
+
+                        # 查找所有用 @tool 装饰的函数
+                        tool_functions = []
+                        for attr_name in dir(tools_module):
+                            attr = getattr(tools_module, attr_name)
+                            # 检查是否是函数且有 tool 装饰器标记
+                            if callable(attr) and hasattr(attr, '__name__'):
+                                # 跳过私有函数和特殊方法
+                                if not attr_name.startswith('_'):
+                                    # 注册工具函数
+                                    try:
+                                        self.toolkit.register_tool_function(attr)
+                                        tool_functions.append(attr_name)
+                                        print(f"[DEBUG] 注册工具: {attr_name}")
+                                    except Exception as e:
+                                        print(f"[WARN] 注册工具 {attr_name} 失败: {e}")
+
+                        if tool_functions:
+                            print(f"[INFO] 技能 '{skill_name}' 注册了 {len(tool_functions)} 个工具: {tool_functions}")
+                except Exception as e:
+                    print(f"[WARN] 导入工具文件失败: {e}")
+
             return True
         except Exception as e:
             print(f"❌ 注册技能 {skill_name} 失败: {e}")
