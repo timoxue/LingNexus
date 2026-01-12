@@ -2,7 +2,7 @@
 """
 Docx Skill Tools - Agent 可调用的工具函数
 
-这些函数使用 @tool 装饰器，可以被 AgentScope 的 Agent 直接调用。
+这些函数可以被 AgentScope 的 Agent 通过 toolkit 调用。
 """
 import sys
 import os
@@ -13,15 +13,15 @@ from typing import Optional
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
 
+# 导入 AgentScope 的 ToolResponse
 try:
-    from agentscope.tool import tool
+    from agentscope.tool import ToolResponse
 except ImportError:
-    # 如果不在 agentscope 环境中，创建一个简单的装饰器
-    def tool(func):
-        return func
+    # 如果不在 agentscope 环境中，定义一个简单的响应类
+    class ToolResponse(str):
+        pass
 
 
-@tool
 def create_new_docx(filename: str = "document.docx") -> str:
     """
     创建一个新的空 Word 文档 (.docx)
@@ -36,6 +36,9 @@ def create_new_docx(filename: str = "document.docx") -> str:
         >>> result = create_new_docx("erp.docx")
         >>> print(result)
         "成功创建文件: /path/to/erp.docx"
+
+    Agent Usage:
+        Agent 可以直接调用此函数: create_new_docx(filename="erp.docx")
     """
     try:
         # 检查文件扩展名
@@ -124,7 +127,6 @@ def create_new_docx(filename: str = "document.docx") -> str:
         return f"✗ 创建文档失败: {str(e)}"
 
 
-@tool
 def create_docx_with_text(filename: str, text_content: str = "") -> str:
     """
     创建一个包含文本内容的 Word 文档
@@ -157,7 +159,6 @@ def create_docx_with_text(filename: str, text_content: str = "") -> str:
         return f"✗ 创建文档失败: {str(e)}"
 
 
-@tool
 def list_docx_files() -> str:
     """
     列出当前目录中的所有 .docx 文件

@@ -6,6 +6,24 @@ license: Proprietary. LICENSE.txt has complete terms
 
 # DOCX creation, editing, and analysis
 
+## Available Tools (Quick Reference)
+
+You have access to the following tools for document operations:
+
+1. **create_new_docx(filename: str)** - Create a new empty Word document
+   - Example: `create_new_docx(filename="erp.docx")`
+   - Returns: Success message with file path
+
+2. **create_docx_with_text(filename: str, text_content: str)** - Create a Word document with text content
+   - Example: `create_docx_with_text(filename="report.docx", text_content="This is the content")`
+   - Returns: Success message with file path and content preview
+
+3. **list_docx_files()** - List all .docx files in current directory
+   - Example: `list_docx_files()`
+   - Returns: List of files with sizes
+
+These are the PRIMARY tools you should use. When a user asks to create or edit a document, call these tools directly.
+
 ## Overview
 
 A user may ask you to create, edit, or analyze the contents of a .docx file. A .docx file is essentially a ZIP archive containing XML files and other resources that you can read or edit. You have different tools and workflows available for different tasks.
