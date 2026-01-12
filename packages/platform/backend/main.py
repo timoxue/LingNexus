@@ -5,6 +5,8 @@ FastAPI 应用入口
 
 from contextlib import asynccontextmanager
 import logging
+import os
+from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +17,21 @@ from api.v1 import auth, skills, agents, monitoring, marketplace
 from core.errors import LingNexusException, create_error_response
 from core.rate_limit import limiter, rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
+
+# 加载环境变量（从项目根目录的 .env 文件）
+try:
+    from dotenv import load_dotenv
+    # 获取项目根目录（backend 的父目录的父目录）
+    project_root = Path(__file__).parent.parent.parent
+    env_file = project_root / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+        logging.info(f"Loaded environment variables from {env_file}")
+    else:
+        logging.warning(f".env file not found at {env_file}")
+except ImportError:
+    logging.warning("python-dotenv not installed, environment variables may not be loaded")
 
 
 # 配置日志
