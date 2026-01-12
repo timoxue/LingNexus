@@ -165,7 +165,7 @@ class AgentExecutor:
             error_detail = traceback.format_exc()
 
             return {
-                "status": "error",
+                "status": "failed",
                 "error_message": f"{str(e)}\n\n{error_detail}",
                 "output_message": None,
                 "tokens_used": 0,
