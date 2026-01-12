@@ -22,8 +22,9 @@ from slowapi.errors import RateLimitExceeded
 # 加载环境变量（从项目根目录的 .env 文件）
 try:
     from dotenv import load_dotenv
-    # 获取项目根目录（backend 的父目录的父目录）
-    project_root = Path(__file__).parent.parent.parent
+    # 获取项目根目录
+    # main.py 在 packages/platform/backend/，需要向上4级到达项目根目录
+    project_root = Path(__file__).parent.parent.parent.parent
     env_file = project_root / ".env"
     if env_file.exists():
         load_dotenv(env_file)
