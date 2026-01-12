@@ -32,7 +32,7 @@ async def list_skills(
     category: str = Query(None, description="Filter by category (external/internal)"),
     is_active: bool = Query(None, description="Filter by active status"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
+    limit: int = Query(20, ge=1, le=1000, description="Number of records to return"),
     db: Session = Depends(get_db),
 ) -> Any:
     """
