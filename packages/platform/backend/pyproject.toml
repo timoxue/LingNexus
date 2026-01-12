@@ -12,6 +12,7 @@ dependencies = [
     "pydantic[email]>=2.5.0",
     "python-multipart>=0.0.6",
     "python-jose[cryptography]>=3.3.0",
+    "slowapi>=0.1.9",
     # 依赖本地 framework（通过工作区）
     "lingnexus-framework",
 ]
