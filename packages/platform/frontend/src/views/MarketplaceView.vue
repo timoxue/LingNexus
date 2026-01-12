@@ -134,6 +134,9 @@
           <el-button type="success" link @click="handleTry(skill)">
             立即试用
           </el-button>
+          <el-button type="warning" link @click="handleCreateAgent(skill)">
+            创建 Agent
+          </el-button>
         </template>
       </el-card>
     </div>
@@ -230,14 +233,57 @@
         </el-table>
       </div>
     </el-dialog>
+
+    <!-- 创建 Agent 对话框 -->
+    <el-dialog v-model="showCreateAgentDialog" title="创建 Agent" width="600px">
+      <div v-if="selectedSkillForAgent">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="技能名称">{{ selectedSkillForAgent.name }}</el-descriptions-item>
+          <el-descriptions-item label="类别">
+            {{ selectedSkillForAgent.category === 'external' ? '外部' : '内部' }}
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <el-divider />
+
+        <el-form :model="agentForm" :rules="agentFormRules" ref="agentFormRef" label-width="100px">
+          <el-form-item label="Agent 名称" prop="name">
+            <el-input v-model="agentForm.name" placeholder="请输入 Agent 名称" />
+            <div class="form-tip">建议使用描述性名称，如 "文档生成助手"</div>
+          </el-form-item>
+          <el-form-item label="描述" prop="description">
+            <el-input v-model="agentForm.description" type="textarea" :rows="3" placeholder="请输入 Agent 描述" />
+          </el-form-item>
+          <el-form-item label="模型" prop="model_name">
+            <el-select v-model="agentForm.model_name" placeholder="请选择模型">
+              <el-option label="Qwen Max" value="qwen-max" />
+              <el-option label="Qwen Plus" value="qwen-plus" />
+              <el-option label="Qwen Turbo" value="qwen-turbo" />
+              <el-option label="DeepSeek Chat" value="deepseek-chat" />
+              <el-option label="DeepSeek Coder" value="deepseek-coder" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="温度" prop="temperature">
+            <el-slider v-model="agentForm.temperature" :min="0" :max="2" :step="0.1" show-input />
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <template #footer>
+        <el-button @click="showCreateAgentDialog = false">取消</el-button>
+        <el-button type="primary" :loading="creatingAgent" @click="handleCreateAgentSubmit">
+          创建
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMarketplaceStore } from '@/stores'
-import { ElMessage } from 'element-plus'
+import { useMarketplaceStore, useAgentsStore } from '@/stores'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import {
   Search,
   Collection,
@@ -247,9 +293,11 @@ import {
   View,
 } from '@element-plus/icons-vue'
 import type { MarketplaceSkill } from '@/api/marketplace'
+import type { AgentCreate } from '@/api/agents'
 
 const router = useRouter()
 const marketplaceStore = useMarketplaceStore()
+const agentsStore = useAgentsStore()
 
 const searchQuery = ref('')
 const filters = reactive({
@@ -261,9 +309,26 @@ const filters = reactive({
 
 const showTryDialog = ref(false)
 const showMySkillsDialog = ref(false)
+const showCreateAgentDialog = ref(false)
 const selectedSkill = ref<MarketplaceSkill | null>(null)
+const selectedSkillForAgent = ref<MarketplaceSkill | null>(null)
 const tryMessage = ref('')
 const trying = ref(false)
+const creatingAgent = ref(false)
+const agentFormRef = ref<FormInstance>()
+
+// Agent 创建表单
+const agentForm = reactive({
+  name: '',
+  description: '',
+  model_name: 'qwen-max',
+  temperature: 0.7,
+})
+
+const agentFormRules: FormRules = {
+  name: [{ required: true, message: '请输入 Agent 名称', trigger: 'blur' }],
+  model_name: [{ required: true, message: '请选择模型', trigger: 'change' }],
+}
 
 // 获取数据
 const fetchData = () => {
@@ -346,6 +411,47 @@ const handleUnsave = async (skill: MarketplaceSkill) => {
   } catch (error: any) {
     ElMessage.error(error.response?.data?.detail || '操作失败')
   }
+}
+
+// 创建 Agent
+const handleCreateAgent = (skill: MarketplaceSkill) => {
+  selectedSkillForAgent.value = skill
+  agentForm.name = `${skill.name}助手`
+  agentForm.description = `使用 ${skill.name} 技能的 AI 助手`
+  agentForm.model_name = 'qwen-max'
+  agentForm.temperature = 0.7
+  showCreateAgentDialog.value = true
+}
+
+// 提交创建 Agent
+const handleCreateAgentSubmit = async () => {
+  if (!agentFormRef.value) return
+
+  await agentFormRef.value.validate(async (valid) => {
+    if (valid && selectedSkillForAgent.value) {
+      creatingAgent.value = true
+      try {
+        const data: AgentCreate = {
+          name: agentForm.name,
+          description: agentForm.description,
+          model_name: agentForm.model_name,
+          temperature: agentForm.temperature,
+          skill_ids: [selectedSkillForAgent.value.id],
+        }
+
+        await agentsStore.createAgent(data)
+        ElMessage.success('Agent 创建成功')
+        showCreateAgentDialog.value = false
+
+        // 跳转到 Agent 列表
+        router.push({ name: 'Agents' })
+      } catch (error: any) {
+        ElMessage.error(error.response?.data?.detail || '创建失败')
+      } finally {
+        creatingAgent.value = false
+      }
+    }
+  })
 }
 
 onMounted(() => {
@@ -464,5 +570,12 @@ onMounted(() => {
 .error-content pre {
   background-color: #fef0f0;
   color: #f56c6c;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+  line-height: 1.5;
 }
 </style>

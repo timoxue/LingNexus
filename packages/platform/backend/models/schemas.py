@@ -199,9 +199,16 @@ class AgentResponse(AgentBase):
     created_by: int
     created_at: datetime
     updated_at: datetime
-    skills: List[SkillResponse] = []
+    skills: List["AgentSkillInfo"] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AgentSkillInfo(BaseModel):
+    """Agent 关联技能的简化信息"""
+    id: int
+    name: str
+    category: str
 
 
 class AgentExecute(BaseModel):

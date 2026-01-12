@@ -4,12 +4,25 @@ FastAPI 应用入口
 """
 
 from contextlib import asynccontextmanager
+import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from db import init_db
 from api.v1 import auth, skills, agents, monitoring, marketplace
+from core.errors import LingNexusException, create_error_response
+from core.rate_limit import limiter, rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -30,6 +43,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# 应用速率限制器
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
 # CORS 配置
 app.add_middleware(
     CORSMiddleware,
@@ -38,6 +55,101 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ==================== 全局异常处理器 ====================
+
+@app.exception_handler(LingNexusException)
+async def lingnexus_exception_handler(request: Request, exc: LingNexusException):
+    """处理 LingNexus 自定义异常"""
+    logger.warning(
+        f"{exc.code}: {exc.message}",
+        extra={
+            "path": request.url.path,
+            "method": request.method,
+            "details": exc.details
+        }
+    )
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=create_error_response(exc, include_details=True)
+    )
+
+
+@app.exception_handler(status.HTTP_401_UNAUTHORIZED)
+async def unauthorized_handler(request: Request, exc):
+    """处理401未授权异常"""
+    logger.warning(f"Unauthorized access: {request.url.path}")
+
+    return JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={
+            "success": False,
+            "error": {
+                "code": "UNAUTHORIZED",
+                "message": "Authentication required"
+            }
+        }
+    )
+
+
+@app.exception_handler(status.HTTP_403_FORBIDDEN)
+async def forbidden_handler(request: Request, exc):
+    """处理403禁止访问异常"""
+    logger.warning(f"Forbidden access: {request.url.path}")
+
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN,
+        content={
+            "success": False,
+            "error": {
+                "code": "FORBIDDEN",
+                "message": "Permission denied"
+            }
+        }
+    )
+
+
+@app.exception_handler(status.HTTP_404_NOT_FOUND)
+async def not_found_handler(request: Request, exc):
+    """处理404未找到异常"""
+    logger.info(f"Resource not found: {request.url.path}")
+
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={
+            "success": False,
+            "error": {
+                "code": "NOT_FOUND",
+                "message": "The requested resource was not found"
+            }
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """处理所有未捕获的异常"""
+    logger.error(
+        f"Unhandled exception: {type(exc).__name__}: {str(exc)}",
+        extra={
+            "path": request.url.path,
+            "method": request.method,
+        },
+        exc_info=True
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "success": False,
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "An unexpected error occurred. Please try again later."
+            }
+        }
+    )
 
 
 # ==================== 根路由 ====================

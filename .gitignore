@@ -79,3 +79,24 @@ logs/
 agentscope_runs/
 agentscope_logs/
 settings.local.json
+
+# Test and debug files
+test_*.py
+debug_*.py
+check_*.py
+fix_*.py
+clean_*.py
+*_test.py
+tests/
+pytest.ini
+vitest.config.ts
+*.test.ts
+*.spec.ts
+
+# Temporary and development notes
+*_SUMMARY.md
+*_GUIDE.md
+QUICKSTART.md
+IMPROVEMENT*.md
+debug_*.html
+create_admin.py

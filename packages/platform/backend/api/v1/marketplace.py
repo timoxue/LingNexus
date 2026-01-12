@@ -412,11 +412,15 @@ async def create_agent_from_skill(
     skill.usage_count += 1
     db.commit()
 
-    # 构建响应
+    # 构建响应 - 只返回技能的简化信息
     agent_dict = AgentResponse.model_validate(agent).model_dump()
-    agent_dict["skills"] = [SkillMarketResponse.model_validate(skill).model_dump()]
+    agent_dict["skills"] = [{
+        "id": skill.id,
+        "name": skill.name,
+        "category": skill.category,
+    }]
 
-    return AgentResponse(**agent_dict)
+    return agent_dict
 
 
 @router.post("/skills/{skill_id}/save", status_code=status.HTTP_201_CREATED)

@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from db.session import get_db
-from db.models import User, Agent, Skill, AgentSkill
+from db.models import User, Agent, Skill, AgentSkill, AgentExecution
 from core.deps import get_current_active_user
-from models.schemas import AgentCreate, AgentUpdate, AgentResponse, AgentExecute, AgentExecuteResponse
+from models.schemas import AgentCreate, AgentUpdate, AgentResponse, AgentExecute, AgentExecuteResponse, ExecutionResponse
 
 router = APIRouter(prefix="/agents", tags=["Agents"])
 
@@ -64,7 +64,7 @@ async def list_agents(
                 })
 
         agent_dict["skills"] = skills
-        result.append(AgentResponse(**agent_dict))
+        result.append(agent_dict)
 
     return result
 
@@ -114,7 +114,7 @@ async def get_agent(
 
     agent_dict["skills"] = skills
 
-    return AgentResponse(**agent_dict)
+    return agent_dict
 
 
 @router.post("", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
@@ -332,6 +332,10 @@ async def execute_agent(
 
     # 执行 Agent
     try:
+        print(f"[DEBUG] 开始执行 Agent: {agent.name}")
+        print(f"[DEBUG] 消息: {execute_request.message}")
+        print(f"[DEBUG] 模型: {agent.model_name}, 温度: {agent.temperature}")
+
         result = await run_agent(
             message=execute_request.message,
             model_name=agent.model_name,
@@ -339,6 +343,8 @@ async def execute_agent(
             max_tokens=agent.max_tokens,
             system_prompt=agent.system_prompt,
         )
+
+        print(f"[DEBUG] Agent 执行完成，状态: {result.get('status')}")
 
         # 更新执行记录
         execution.status = result["status"]
@@ -361,13 +367,124 @@ async def execute_agent(
 
     except Exception as e:
         # 执行失败，更新记录
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[ERROR] Agent 执行失败:")
+        print(f"[ERROR] {str(e)}")
+        print(f"[ERROR] Traceback:\n{error_trace}")
+
         execution.status = "failed"
-        execution.error_message = str(e)
+        execution.error_message = f"{str(e)}\n\n{error_trace}"
         execution.completed_at = func.now()
         db.commit()
         db.refresh(execution)
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Agent execution failed: {str(e)}",
+            detail=f"Agent execution failed: {str(e)}\n\n{error_trace}",
         )
+
+
+@router.get("/{agent_id}/executions", response_model=List[ExecutionResponse])
+async def get_agent_executions(
+    agent_id: int,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
+    status: str = Query(None, description="Filter by status"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    获取代理执行历史
+
+    Args:
+        agent_id: 代理 ID
+        skip: 跳过记录数
+        limit: 返回记录数
+        status: 状态过滤 (pending/running/success/failed)
+        db: 数据库会话
+        current_user: 当前登录用户
+
+    Returns:
+        List[ExecutionResponse]: 执行历史列表
+
+    Raises:
+        HTTPException: 代理不存在
+    """
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent not found",
+        )
+
+    # 检查权限
+    if agent.created_by != current_user.id and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
+        )
+
+    query = db.query(AgentExecution).filter(AgentExecution.agent_id == agent_id)
+
+    # 应用状态过滤
+    if status:
+        query = query.filter(AgentExecution.status == status)
+
+    # 分页并按创建时间倒序
+    executions = query.order_by(AgentExecution.created_at.desc()).offset(skip).limit(limit).all()
+
+    return [ExecutionResponse.model_validate(e) for e in executions]
+
+
+@router.get("/{agent_id}/executions/{execution_id}", response_model=ExecutionResponse)
+async def get_agent_execution(
+    agent_id: int,
+    execution_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    获取单条执行记录详情
+
+    Args:
+        agent_id: 代理 ID
+        execution_id: 执行记录 ID
+        db: 数据库会话
+        current_user: 当前登录用户
+
+    Returns:
+        ExecutionResponse: 执行记录详情
+
+    Raises:
+        HTTPException: 代理或执行记录不存在
+    """
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent not found",
+        )
+
+    # 检查权限
+    if agent.created_by != current_user.id and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
+        )
+
+    execution = db.query(AgentExecution).filter(
+        AgentExecution.id == execution_id,
+        AgentExecution.agent_id == agent_id,
+    ).first()
+
+    if not execution:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Execution not found",
+        )
+
+    return ExecutionResponse.model_validate(execution)
+

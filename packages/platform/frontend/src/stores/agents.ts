@@ -4,12 +4,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import * as agentsApi from '@/api/agents'
-import type { Agent, AgentCreate, AgentUpdate, AgentExecuteRequest } from '@/api/agents'
+import type { Agent, AgentCreate, AgentUpdate, AgentExecuteRequest, AgentExecution } from '@/api/agents'
 
 export const useAgentsStore = defineStore('agents', () => {
   // 状态
   const agents = ref<Agent[]>([])
   const currentAgent = ref<Agent | null>(null)
+  const executions = ref<AgentExecution[]>([])
   const loading = ref(false)
   const executing = ref(false)
 
@@ -107,9 +108,22 @@ export const useAgentsStore = defineStore('agents', () => {
     currentAgent.value = null
   }
 
+  /**
+   * 获取代理执行历史
+   */
+  const fetchExecutions = async (agentId: number, params?: { skip?: number; limit?: number; status?: string }) => {
+    loading.value = true
+    try {
+      executions.value = await agentsApi.getAgentExecutions(agentId, params)
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     agents,
     currentAgent,
+    executions,
     loading,
     executing,
     fetchAgents,
@@ -119,5 +133,6 @@ export const useAgentsStore = defineStore('agents', () => {
     deleteAgent,
     executeAgent,
     clearCurrentAgent,
+    fetchExecutions,
   }
 })

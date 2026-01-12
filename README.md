@@ -102,15 +102,24 @@ uv run python -m lingnexus.cli search "GLP-1"
 
 ### 3. 使用 Platform
 
+#### ⚠️ 架构说明
+
+**当前架构**（临时方案）：
+- Backend 直接导入 Framework 代码
+- 适合：开发、测试、单机部署
+- 生产环境计划使用微服务架构（详见 [architecture.md](docs/architecture.md#platform-与-framework-架构)）
+
 #### 启动服务
 
 ```bash
-# 后端开发
-cd packages/platform/backend
+# 后端（确保先同步依赖）
+cd D:/internal/LingNexus
 uv sync
+
+cd packages/platform/backend
 uv run uvicorn main:app --reload --port 8000
 
-# 前端开发（新终端窗口）
+# 前端（新终端窗口）
 cd packages/platform/frontend
 npm install
 npm run dev
@@ -120,24 +129,41 @@ npm run dev
 
 #### Platform 功能
 
+**认证系统** (`/login`, `/register`):
+- 用户注册和登录
+- JWT Token 认证
+- 角色权限管理（管理员、普通用户）
+
 **技能市场** (`/marketplace`):
-- 浏览公开技能（无需登录）
-- 搜索、过滤、排序技能
-- 试用技能（立即测试效果）
-- 收藏和评分技能
-- 一键创建 Agent
+- 🔍 浏览 19+ 公开技能（无需登录）
+- 🏷️ 搜索、过滤、排序技能
+  - 按类别：外部/内部
+  - 按范围：公开/团队/私有
+  - 按官方：官方认证技能
+- 🧪 试用技能（立即测试效果，无需登录）
+- ⭐ 收藏和评分技能
+- 🚀 一键从技能创建 Agent
 
-**代理管理** (`/agents`):
-- 创建和配置 Agent
-- 选择模型（Qwen/DeepSeek）
-- 关联技能
-- 执行 Agent 并查看结果
-- 查看执行历史
+**Agent 管理** (`/agents`):
+- ➕ 创建和配置 Agent
+  - 选择模型（Qwen Max/Plus/Turbo、DeepSeek Chat/Coder）
+  - 配置温度参数
+  - 关联多个技能
+  - 自定义系统提示
+- ✏️ 编辑和删除 Agent
+- ▶️ 执行 Agent
+  - 发送消息给 Agent
+  - 实时查看执行结果
+  - 查看 Token 使用和执行时间
+- 📜 查看执行历史
+  - 状态追踪
+  - 详细的输入/输出消息
+  - 错误信息展示
 
-**监控数据** (`/monitoring`):
-- 查看临床试验数据
-- CDE 注册信息
-- 数据可视化展示
+**技能同步** (`/skills`):
+- 🔄 从 Framework 自动导入技能
+- 📊 同步统计（创建、更新、跳过）
+- ⚙️ 管理员专属功能
 
 ## 📚 文档
 
@@ -302,6 +328,36 @@ uv run python -m lingnexus.cli monitor --project "司美格鲁肽"
 3. 创建 API Key
 
 ## 📝 更新日志
+
+### v1.0.1 (2025-01-12)
+
+**Platform 功能增强**：
+- ✨ Agent 创建功能
+  - 技能多选（可搜索、可过滤）
+  - 完整的配置选项（模型、温度、Token、系统提示）
+  - Agent 列表显示关联技能
+- ✨ Agent 执行功能
+  - 实时执行对话框
+  - 执行结果展示（输出、错误、Token、时间）
+  - 完整的执行历史记录
+  - 点击查看执行详情
+- ✨ 技能同步功能
+  - 从 Framework 自动导入技能
+  - 同步状态和统计
+  - 强制更新选项
+- ✨ Marketplace 快速创建
+  - 从技能一键创建 Agent
+  - 预填充配置信息
+  - 创建后跳转到 Agent 列表
+- ⚠️ 架构文档更新
+  - 说明当前临时方案的优缺点
+  - 提供未来微服务架构的迁移计划
+
+**Bug 修复**：
+- 🐛 修复 JWT Token 认证问题（sub 字段类型）
+- 🐛 修复 Agent 创建时技能数据类型问题
+- 🐛 修复 Agent 列表的 Pydantic 验证错误
+- 🐛 修复 Agent 执行时的数据库字段问题
 
 ### v1.0.0 (2025-01-11)
 

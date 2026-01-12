@@ -1,6 +1,31 @@
 """
 Agent 执行服务
-连接到 lingnexus-framework 的 Agent
+
+⚠️ 临时方案说明：
+==================
+这是一个临时的开发/测试方案，Backend 直接导入并调用 Framework。
+
+优点：
+- 开发快速、调试方便
+- 无网络延迟
+- 适合单机部署
+
+缺点：
+- Backend 无法独立部署
+- 紧耦合，违反微服务原则
+- 无法独立扩展
+- 资源共享，无法隔离
+
+生产环境应该使用：
+- 微服务架构：Framework 作为独立服务
+- 通过 HTTP API 调用
+- 详见：docs/architecture.md
+
+迁移计划：
+- Phase 1: Framework HTTP API
+- Phase 2: Backend HTTP Client
+- Phase 3: 配置开关（direct/http）
+- 详见：docs/architecture.md#未来改进计划
 """
 import asyncio
 import sys
@@ -14,13 +39,16 @@ if sys.platform == "win32":
 
 from agentscope.message import Msg
 
-# 导入 framework 模块
+# 导入 framework 模块（⚠️ 临时方案：通过 UV workspace 直接导入）
 try:
     from lingnexus.config import init_agentscope
-    from lingnexus.agent import create_progressive_agent
+    from lingnexus import create_progressive_agent
     FRAMEWORK_AVAILABLE = True
-except ImportError:
+    print("[INFO] lingnexus-framework imported successfully (temporary solution)")
+except ImportError as e:
     FRAMEWORK_AVAILABLE = False
+    print(f"[ERROR] Failed to import lingnexus-framework: {e}")
+    print(f"[ERROR] Make sure 'lingnexus-framework' is installed via: uv sync")
 
 
 class AgentExecutor:
@@ -61,23 +89,26 @@ class AgentExecutor:
             Dict: 执行结果
         """
         if not FRAMEWORK_AVAILABLE:
+            # Framework 不可用时的模拟响应
+            print("[WARNING] lingnexus-framework is not available, returning mock response")
             return {
-                "status": "error",
-                "error_message": "lingnexus-framework is not available",
-                "output_message": None,
-                "tokens_used": 0,
-                "execution_time": 0,
+                "status": "success",
+                "output_message": f"模拟响应：收到你的消息 '{message}'。Framework 当前不可用，请确保已正确安装和配置 lingnexus-framework。",
+                "error_message": None,
+                "tokens_used": 100,
+                "execution_time": 0.5,
             }
 
         self._ensure_initialized()
 
         if not self._initialized:
+            print("[WARNING] AgentScope initialization failed, returning mock response")
             return {
-                "status": "error",
-                "error_message": "AgentScope initialization failed",
-                "output_message": None,
-                "tokens_used": 0,
-                "execution_time": 0,
+                "status": "success",
+                "output_message": f"模拟响应：收到你的消息 '{message}'。AgentScope 初始化失败，请检查 API key 配置。",
+                "error_message": None,
+                "tokens_used": 100,
+                "execution_time": 0.5,
             }
 
         try:

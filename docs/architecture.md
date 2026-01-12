@@ -275,3 +275,338 @@ multi_agent = create_multi_skill_agent(
 - [Skill 集成指南](skill_integration.md)
 - [CLI 使用指南](cli_guide.md)
 
+---
+
+# Platform 与 Framework 架构
+
+## 📦 当前架构（临时方案）
+
+### 架构概览
+
+```
+LingNexus Monorepo
+├── packages/
+│   ├── framework/          ← Agent 运行框架
+│   │   ├── lingnexus/      ← 核心 Agent 逻辑
+│   │   ├── skills/         ← Claude Skills
+│   │   └── tests/
+│   │
+│   └── platform/
+│       └── backend/        ← Web API & 数据管理
+│           ├── api/        ← REST API
+│           ├── db/         ← 数据库
+│           ├── services/
+│           │   └── agent_service.py  ← ⚠️ 直接导入 framework
+│           └── tests/
+```
+
+### 依赖关系
+
+**packages/platform/backend/pyproject.toml**:
+```toml
+dependencies = [
+    "lingnexus-framework",  # ← 通过 UV workspace 依赖
+]
+
+[tool.uv.sources]
+lingnexus-framework = { workspace = true }
+```
+
+**packages/platform/backend/services/agent_service.py**:
+```python
+# ⚠️ 临时方案：直接导入 Framework
+from lingnexus import create_progressive_agent
+from lingnexus.config import init_agentscope
+
+async def execute_agent(message, model_name, temperature):
+    agent = create_progressive_agent(...)  # ← 进程内调用
+    return await agent(message)
+```
+
+### 调用流程
+
+```
+用户请求 (HTTP)
+    ↓
+Platform Backend (FastAPI :8000)
+    ↓
+AgentController.execute_agent()
+    ↓
+agent_service.py (导入 lingnexus)  ← ⚠️ 紧耦合
+    ↓
+create_progressive_agent()  ← 进程内直接调用
+    ↓
+Agent 执行
+    ↓
+返回结果
+```
+
+## ⚠️ 当前架构的问题
+
+### 1. 无法独立部署
+
+| 问题 | 说明 |
+|------|------|
+| **紧耦合** | Backend 代码直接导入 Framework，必须包含 Framework 代码 |
+| **无法独立运行** | Backend 不能单独部署，必须带上整个 Framework |
+| **依赖复杂** | Python 环境、依赖必须完全一致 |
+| **资源浪费** | Backend 服务器也需要加载 Agent 模型 |
+
+### 2. 技术限制
+
+- ❌ Backend 和 Framework 必须使用相同 Python 版本
+- ❌ Backend 无法独立扩展（扩容时必须带上 Framework）
+- ❌ Framework 更新需要重新部署 Backend
+- ❌ 无法使用不同技术栈（如 Go、Java 实现 Backend）
+
+### 3. 违反设计原则
+
+- ❌ **单一职责原则**：Backend 既管理数据又执行 Agent
+- ❌ **微服务原则**：应该独立部署、独立扩展
+- ❌ **松耦合原则**：直接导入导致紧耦合
+
+## 🎯 未来改进计划
+
+### 方案 1：微服务架构（推荐）
+
+#### 目标架构
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Platform Backend (可独立部署)                        │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ FastAPI Server (:8000)                        │  │
+│  │  - 用户认证                                    │  │
+│  │  - 技能管理 (CRUD)                             │  │
+│  │  - Agent 管理 (CRUD)                           │  │
+│  │  - 执行历史 (存储)                              │  │
+│  │  - WebSocket (实时通信)                        │  │
+│  └───────────────────────────────────────────────┘  │
+│                      │ HTTP/REST                     │
+│                      ▼                               │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ Framework Service (独立服务)                   │  │
+│  │  FastAPI/Flask Server (:8001)                 │  │
+│  │  - Agent 执行引擎                              │  │
+│  │  - Skill 加载器                                │  │
+│  │  - Model 管理 (DashScope)                     │  │
+│  │  - 资源隔离                                    │  │
+│  └───────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+```
+
+#### 优势
+
+| 特性 | 说明 |
+|------|------|
+| **独立部署** | Backend 和 Framework 可以独立部署、独立扩展 |
+| **技术解耦** | Backend 可以用其他语言重写（Go、Java） |
+| **故障隔离** | Framework 崩溃不影响 Backend 的数据管理功能 |
+| **弹性扩展** | 根据负载独立扩展 Backend 或 Framework |
+| **团队协作** | 不同团队可以独立开发、部署 |
+
+#### 实施步骤
+
+**Phase 1: Framework HTTP API**
+
+创建 `packages/framework/lingnexus/server.py`:
+
+```python
+"""
+Framework HTTP Server
+提供 Agent 执行的 HTTP API
+"""
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from lingnexus import create_progressive_agent
+
+app = FastAPI(title="LingNexus Framework Service")
+
+class ExecuteRequest(BaseModel):
+    agent_config: dict  # model_name, temperature, skills
+    message: str
+
+class ExecuteResponse(BaseModel):
+    status: str
+    output_message: str
+    error_message: str = None
+    tokens_used: int
+    execution_time: float
+
+@app.post("/api/v1/execute", response_model=ExecuteResponse)
+async def execute_agent(request: ExecuteRequest):
+    """执行 Agent（HTTP API）"""
+    try:
+        agent = create_progressive_agent(**request.agent_config)
+        from agentscope.message import Msg
+        msg = Msg(name="user", content=request.message)
+        response = await agent(msg)
+
+        return ExecuteResponse(
+            status="success",
+            output_message=response.content,
+            tokens_used=0,
+            execution_time=0.0,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)
+```
+
+**Phase 2: Platform Backend HTTP Client**
+
+```python
+# packages/platform/backend/services/agent_service.py
+"""
+Agent 执行服务（生产方案：通过 HTTP API 调用 Framework）
+"""
+import httpx
+import os
+
+FRAMEWORK_SERVICE_URL = os.getenv(
+    "FRAMEWORK_SERVICE_URL",
+    "http://localhost:8001"
+)
+
+async def execute_agent(
+    message: str,
+    model_name: str = "qwen-max",
+    temperature: float = 0.7,
+    skill_ids: list = None,
+) -> dict:
+    """
+    调用 Framework Service 的 HTTP API
+
+    Args:
+        message: 用户消息
+        model_name: 模型名称
+        temperature: 温度
+        skill_ids: 关联技能 ID 列表
+
+    Returns:
+        执行结果
+    """
+    async with httpx.AsyncClient(timeout=300.0) as client:
+        response = await client.post(
+            f"{FRAMEWORK_SERVICE_URL}/api/v1/execute",
+            json={
+                "agent_config": {
+                    "model_name": model_name,
+                    "temperature": temperature,
+                },
+                "message": message,
+            },
+        )
+        response.raise_for_status()
+        return response.json()
+```
+
+**Phase 3: 配置开关**
+
+```python
+# packages/platform/backend/core/config.py
+class Settings:
+    # Agent 执行模式：direct（开发） | http（生产）
+    AGENT_EXECUTION_MODE: str = os.getenv("AGENT_EXECUTION_MODE", "direct")
+    FRAMEWORK_SERVICE_URL: str = os.getenv("FRAMEWORK_SERVICE_URL", "http://localhost:8001")
+
+# packages/platform/backend/services/agent_service.py
+if settings.AGENT_EXECUTION_MODE == "http":
+    # 生产环境：HTTP API 调用
+    from .agent_service_http import execute_agent
+else:
+    # 开发环境：直接导入
+    from .agent_service_direct import execute_agent
+```
+
+**Phase 4: 部署**
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  platform-backend:
+    build: ./packages/platform/backend
+    ports:
+      - "8000:8000"
+    environment:
+      - AGENT_EXECUTION_MODE=http
+      - FRAMEWORK_SERVICE_URL=http://framework-service:8001
+    depends_on:
+      - framework-service
+
+  framework-service:
+    build: ./packages/framework
+    ports:
+      - "8001:8001"
+    environment:
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+```
+
+### 方案 2：消息队列（异步）
+
+```
+Platform Backend  ─────►  Redis/RabbitMQ  ─────►  Framework Workers
+    (Web API)              (任务队列)              (Agent 执行)
+```
+
+**适用场景**：
+- 长时间运行的 Agent 任务
+- 需要异步执行的场景
+- 需要任务队列和重试机制
+
+### 方案 3：gRPC（高性能）
+
+**适用场景**：
+- 需要更高性能的通信
+- 服务间频繁调用
+- 需要强类型定义
+
+## 📅 实施时间表
+
+| 阶段 | 任务 | 优先级 | 状态 |
+|------|------|--------|------|
+| **当前** | 临时方案（直接导入） | P0 | ✅ 已完成 |
+| **Phase 1** | Framework HTTP API 实现 | P0 | ⏳ 待开始 |
+| **Phase 2** | Backend HTTP Client | P0 | ⏳ 待开始 |
+| **Phase 3** | 配置开关（direct/http） | P1 | ⏳ 待开始 |
+| **Phase 4** | Docker Compose 部署 | P1 | ⏳ 待开始 |
+| **Phase 5** | 生产环境部署 | P2 | ⏳ 待开始 |
+
+## 🎯 临时方案的限制
+
+### 适合场景
+
+✅ **开发环境**：快速迭代、调试方便
+✅ **测试环境**：功能测试、集成测试
+✅ **小规模部署**：单机部署、内部使用
+
+### 不适合场景
+
+❌ **生产环境**：无法独立扩展、故障隔离
+❌ **大规模部署**：资源浪费、无法独立扩展
+❌ **多团队协作**：紧耦合、互相影响
+
+## 💡 最佳实践
+
+### 当前（临时方案）
+
+1. **明确标注**：在代码中添加 `# ⚠️ 临时方案` 注释
+2. **文档说明**：在 README 中说明这是开发方案
+3. **定期回顾**：每个 Sprint 回顾是否需要迁移
+
+### 迁移到微服务后
+
+1. **灰度发布**：先用配置开关控制，逐步切换
+2. **监控指标**：API 延迟、成功率、资源使用
+3. **回滚方案**：保留直接导入模式作为备选
+
+## 📚 相关资源
+
+- [微服务架构模式](https://microservices.io/patterns/microservices.html)
+- [FastAPI 高性能部署](https://fastapi.tiangolo.com/deployment/)
+- [Docker Compose 生产环境](https://docs.docker.com/compose/production/)
+

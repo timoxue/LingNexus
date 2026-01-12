@@ -2,10 +2,14 @@
   <div class="skills-view">
     <div class="header">
       <h1>技能管理</h1>
-      <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Plus /></el-icon>
-        创建技能
-      </el-button>
+      <el-space>
+        <!-- 同步技能按钮（仅管理员可见） -->
+        <SkillSyncButton v-if="userStore.is_superuser" @success="fetchData" />
+        <el-button type="primary" @click="showCreateDialog = true">
+          <el-icon><Plus /></el-icon>
+          创建技能
+        </el-button>
+      </el-space>
     </div>
 
     <!-- 筛选条件 -->
@@ -99,13 +103,15 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSkillsStore } from '@/stores'
+import { useSkillsStore, useUserStore } from '@/stores'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { Skill, SkillCreate, SkillUpdate } from '@/api/skills'
+import SkillSyncButton from '@/components/SkillSyncButton.vue'
 
 const router = useRouter()
 const skillsStore = useSkillsStore()
+const userStore = useUserStore()
 
 const formRef = ref<FormInstance>()
 const showCreateDialog = ref(false)

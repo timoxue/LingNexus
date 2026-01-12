@@ -37,6 +37,30 @@ export interface SkillListParams {
 }
 
 /**
+ * 技能同步响应
+ */
+export interface SkillSyncResult {
+  total: number
+  created: number
+  updated: number
+  skipped: number
+  failed: number
+  errors: string[]
+  message: string
+}
+
+/**
+ * 技能同步状态
+ */
+export interface SkillSyncStatus {
+  framework_path: string
+  skills_dir_exists: boolean
+  external_skills_count: number
+  internal_skills_count: number
+  total_skills_count: number
+}
+
+/**
  * 获取技能列表
  */
 export const getSkills = async (params?: SkillListParams): Promise<Skill[]> => {
@@ -73,4 +97,23 @@ export const updateSkill = async (id: number, data: SkillUpdate): Promise<Skill>
  */
 export const deleteSkill = async (id: number): Promise<void> => {
   await apiClient.delete(`/skills/${id}`)
+}
+
+/**
+ * 同步技能（从 Framework）
+ * @param forceUpdate 是否强制更新已存在的技能
+ */
+export const syncSkills = async (forceUpdate = false): Promise<SkillSyncResult> => {
+  const response = await apiClient.post<SkillSyncResult>('/skills/sync', null, {
+    params: { force_update: forceUpdate }
+  })
+  return response.data
+}
+
+/**
+ * 获取技能同步状态
+ */
+export const getSyncStatus = async (): Promise<SkillSyncStatus> => {
+  const response = await apiClient.get<SkillSyncStatus>('/skills/sync/status')
+  return response.data
 }

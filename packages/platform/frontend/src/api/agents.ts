@@ -16,7 +16,13 @@ export interface Agent {
   created_by: number
   created_at: string
   updated_at: string
-  skills: Skill[]
+  skills: AgentSkillInfo[]
+}
+
+export interface AgentSkillInfo {
+  id: number
+  name: string
+  category: string
 }
 
 export interface AgentCreate {
@@ -51,6 +57,19 @@ export interface AgentExecuteResponse {
   error_message?: string
   tokens_used?: number
   execution_time?: number
+}
+
+export interface AgentExecution {
+  id: number
+  agent_id: number
+  input_message: string
+  output_message?: string
+  status: string
+  error_message?: string
+  tokens_used?: number
+  execution_time?: number
+  created_at: string
+  completed_at?: string
 }
 
 /**
@@ -97,5 +116,24 @@ export const deleteAgent = async (id: number): Promise<void> => {
  */
 export const executeAgent = async (id: number, data: AgentExecuteRequest): Promise<AgentExecuteResponse> => {
   const response = await apiClient.post<AgentExecuteResponse>(`/agents/${id}/execute`, data)
+  return response.data
+}
+
+/**
+ * 获取代理执行历史
+ */
+export const getAgentExecutions = async (
+  id: number,
+  params?: { skip?: number; limit?: number; status?: string }
+): Promise<AgentExecution[]> => {
+  const response = await apiClient.get<AgentExecution[]>(`/agents/${id}/executions`, { params })
+  return response.data
+}
+
+/**
+ * 获取单条执行记录详情
+ */
+export const getAgentExecution = async (agentId: number, executionId: number): Promise<AgentExecution> => {
+  const response = await apiClient.get<AgentExecution>(`/agents/${agentId}/executions/${executionId}`)
   return response.data
 }

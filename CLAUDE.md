@@ -698,11 +698,13 @@ npm run dev
 
 ### Platform Framework Integration
 
-**Importing from Framework**:
+**⚠️ Current Architecture (Temporary Solution)**:
+
+The Platform currently uses a **temporary direct-import approach** where the Backend directly imports Framework code:
 
 ```python
 # Backend: services/agent_service.py
-from lingnexus.agent import create_progressive_agent
+from lingnexus import create_progressive_agent
 from lingnexus.config import init_agentscope
 
 # Initialize AgentScope
@@ -715,12 +717,37 @@ agent = create_progressive_agent(
 )
 ```
 
+**Advantages**:
+- ✅ Fast development and easy debugging
+- ✅ No network latency
+- ✅ Suitable for single-machine deployment
+
+**Limitations**:
+- ❌ Backend cannot be deployed independently
+- ❌ Tight coupling violates microservice principles
+- ❌ Cannot scale independently
+- ❌ Resource sharing without isolation
+
+**⚠️ Important**: This is a **temporary solution** for development/testing only.
+
+**Future Architecture (Planned)**:
+
+Production environment should use:
+- **Microservices Architecture**: Framework as standalone HTTP service
+- Platform Backend calls Framework via REST API
+- Independent deployment and scaling
+- See: `docs/architecture.md#platform-与-framework-架构` for full migration plan
+
 **Workspace Dependencies**:
 
 Platform automatically imports Framework through uv workspace:
 - Changes to Framework are immediately available
 - No need to reinstall packages
 - Shared dependencies managed at root level
+
+**For detailed architecture documentation**, see:
+- `docs/architecture.md` - Complete Platform/Framework architecture analysis
+- Migration plan with Phase 1-5 implementation steps
 
 ### Known Issues and Solutions
 
@@ -757,3 +784,63 @@ For more information, see:
 - `MIGRATION_GUIDE.md` - v0.2.0 migration guide
 - `REFACTOR_GUIDE.md` - Detailed refactoring process
 - `docs/development/architecture.md` - System architecture
+
+## Version History
+
+### v1.0.1 (2025-01-12)
+
+**Platform Features**:
+- ✨ Agent Creation
+  - Skill multi-selection (searchable, filterable)
+  - Complete configuration options (model, temperature, tokens, system prompt)
+  - Display associated skills in agent list
+- ✨ Agent Execution
+  - Real-time execution dialog
+  - Execution result display (output, error, tokens, time)
+  - Complete execution history tracking
+  - View execution details
+- ✨ Skills Synchronization
+  - Auto-import from Framework
+  - Sync statistics (created, updated, skipped)
+  - Force update option
+- ✨ Marketplace Quick Create
+  - One-click agent creation from skills
+  - Pre-filled configuration
+  - Navigate to agent list after creation
+- ⚠️ Architecture documentation updated
+  - Explains current temporary solution pros/cons
+  - Future microservices migration plan
+
+**Bug Fixes**:
+- 🐛 Fixed JWT Token authentication (sub field type)
+- 🐛 Fixed skill data type on agent creation
+- 🐛 Fixed Pydantic validation error on agent list
+- 🐛 Fixed database field issue on agent execution
+- 🐛 Fixed Framework import path (lingnexus.agent → lingnexus)
+
+### v1.0.0 (2025-01-11)
+
+**Platform Initial Release**:
+- ✨ Skills Marketplace 2.0
+- ✨ Permission management (private/team/public)
+- ✨ Agent execution functionality
+- ✨ Complete Vue 3 frontend
+
+### v0.2.0 (2025-01-10)
+
+**Framework Monorepo Refactoring**:
+- ✨ Restructured to Monorepo architecture
+- ✨ Separated Framework and Platform packages
+- ✨ Complete documentation system
+- ✨ CDE scraper (anti-detection enhanced)
+- ✨ Human behavior simulation
+- ✨ Smart retry mechanism
+
+### v0.1.9 (2025-01-XX)
+
+**Framework Initial Release**:
+- ✨ AgentScope multi-agent system
+- ✨ Claude Skills compatibility
+- ✨ Progressive disclosure mechanism
+- ✨ ClinicalTrials.gov data collection
+- ✨ Three-tier storage architecture
