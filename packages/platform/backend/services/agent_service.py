@@ -124,7 +124,21 @@ class AgentExecutor:
 
             # 如果有系统提示，设置到 Agent
             if system_prompt:
-                agent.system_prompt = system_prompt
+                # 在自定义系统提示前添加重要指令，防止幻觉
+                enhanced_prompt = """# 重要指令
+
+你必须只使用 available skills 列表中明确列出的技能。不要假设或编造不存在的技能名称（如 "common"）。
+
+""" + system_prompt
+                agent.system_prompt = enhanced_prompt
+            else:
+                # 如果没有自定义系统提示，添加基础指导
+                agent.system_prompt = """# 重要指令
+
+你必须只使用 available skills 列表中明确列出的技能。不要假设或编造不存在的技能名称（如 "common"）。
+
+请仔细查看 available skills 列表，只使用列表中明确列出的技能名称。
+"""
 
             # 创建用户消息
             user_msg = Msg(
