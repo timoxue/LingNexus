@@ -10,11 +10,13 @@ Agent 执行服务
 import asyncio
 import sys
 import io
+import os
 import tempfile
 import shutil
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 import logging
+from core.config import AGENT_ARTIFACTS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,14 @@ try:
 except ImportError as e:
     FRAMEWORK_AVAILABLE = False
     logger.error(f"Failed to import lingnexus-framework: {e}")
+
+# 导入文件服务
+try:
+    from .file_service import FileService
+    FILE_SERVICE_AVAILABLE = True
+except ImportError as e:
+    FILE_SERVICE_AVAILABLE = False
+    logger.error(f"Failed to import FileService: {e}")
 
 
 class TrackedToolkit(Toolkit):
@@ -74,8 +84,10 @@ class SkillRegistry:
 
     def create_temp_skill_dir(self) -> Path:
         """创建临时目录存放 skill 文件"""
-        if self.temp_dir is None:
+        # 如果 temp_dir 为 None 或不存在，重新创建
+        if self.temp_dir is None or not self.temp_dir.exists():
             self.temp_dir = Path(tempfile.mkdtemp(prefix="lingnexus_skills_"))
+            logger.info(f"Created new temp skill directory: {self.temp_dir}")
         return self.temp_dir
 
     def register_skill_from_db(
@@ -171,6 +183,50 @@ class SkillRegistry:
             except Exception as e:
                 logger.warning(f"Failed to cleanup temp directory: {e}")
 
+    def scan_for_generated_files(self) -> List[Path]:
+        """
+        扫描临时目录查找生成的文件
+
+        Returns:
+            找到的文件路径列表
+        """
+        generated_files = []
+        if not self.temp_dir or not self.temp_dir.exists():
+            logger.warning(f"Temp directory not found: {self.temp_dir}")
+            return generated_files
+
+        try:
+            logger.info(f"Scanning for generated files in: {self.temp_dir}")
+
+            # 遍历临时目录，查找生成的文件
+            for root, dirs, files in os.walk(self.temp_dir):
+                for file in files:
+                    file_path = Path(root) / file
+
+                    # 记录所有文件（用于调试）
+                    logger.info(f"Scanning file: {file_path} (ext: {file_path.suffix})")
+
+                    # 跳过 SKILL.md 和脚本文件
+                    if file_path.name == "SKILL.md":
+                        logger.info(f"Skipping SKILL.md: {file_path}")
+                        continue
+                    if file_path.suffix == '.py':
+                        logger.info(f"Skipping Python file: {file_path}")
+                        continue
+
+                    # 只保留有意义的文件（文档、图片等）
+                    if file_path.suffix in ['.docx', '.pdf', '.xlsx', '.pptx', '.png', '.jpg', '.jpeg', '.gif', '.txt']:
+                        generated_files.append(file_path)
+                        logger.info(f"✓ Found generated file: {file_path}")
+                    else:
+                        logger.info(f"✗ Skipping file with unsupported extension: {file_path}")
+
+            logger.info(f"Found {len(generated_files)} generated files (supported types)")
+        except Exception as e:
+            logger.error(f"Error scanning for generated files: {e}")
+
+        return generated_files
+
 
 class AgentExecutor:
     """Agent 执行器"""
@@ -178,6 +234,20 @@ class AgentExecutor:
     def __init__(self):
         self._initialized = False
         self.skill_registry = SkillRegistry()
+        self._generated_files: List[Path] = []  # 保存生成的文件路径
+
+        # 初始化并保存 SkillLoader 实例（用于渐进式披露工具）
+        if FRAMEWORK_AVAILABLE:
+            try:
+                from lingnexus.utils.skill_loader import SkillLoader
+                framework_skills_dir = framework_dir / "skills"
+                self.skill_loader = SkillLoader(skills_base_dir=framework_skills_dir)
+                logger.info(f"SkillLoader initialized with skills directory: {framework_skills_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize SkillLoader: {e}")
+                self.skill_loader = None
+        else:
+            self.skill_loader = None
 
     def _ensure_initialized(self):
         """确保 AgentScope 已初始化"""
@@ -287,6 +357,19 @@ class AgentExecutor:
 
                 logger.info(f"Successfully loaded {success_count}/{len(skills)} skills")
 
+            # 注册渐进式披露工具（load_skill_instructions 等）
+            # 使用已保存的 SkillLoader 实例，确保工具可以访问其状态
+            if self.skill_loader is not None:
+                try:
+                    progressive_tools = self.skill_loader.get_progressive_tools()
+                    for tool_func in progressive_tools:
+                        toolkit.register_tool_function(tool_func)
+                    logger.info(f"Registered {len(progressive_tools)} progressive disclosure tools")
+                except Exception as e:
+                    logger.warning(f"Failed to register progressive tools: {e}")
+            else:
+                logger.warning("SkillLoader not initialized, skipping progressive tools registration")
+
             # 构建系统提示词
             if system_prompt is None:
                 skill_names = [s['name'] for s in skills] if skills else []
@@ -294,7 +377,13 @@ class AgentExecutor:
 
 **可用技能**: {', '.join(skill_names) if skill_names else '无'}
 
-请根据用户的需求，使用合适的技能来完成任务。如果需要使用某个技能，先使用 load_skill_instructions 工具加载该技能的完整说明。
+**重要提示**:
+1. 如果用户要求创建文档、文件等，请直接使用对应的工具函数，不要只是解释步骤
+2. 例如：创建 docx 文档时，直接调用 create_new_docx(filename="xxx.docx")
+3. 不要重复调用 load_skill_instructions，一次就足够了
+4. 你的目标是完成任务，而不是只是描述如何完成任务
+
+请根据用户的需求，直接使用合适的工具来完成任务。
 """
 
             # 创建模型
@@ -313,6 +402,7 @@ class AgentExecutor:
                 model=model,
                 formatter=formatter,
                 toolkit=toolkit,
+                max_iters=10,  # 限制最大迭代次数，防止无限循环
             )
 
             # 创建用户消息
@@ -322,9 +412,33 @@ class AgentExecutor:
                 content=message,
             )
 
-            # 执行 Agent
-            logger.info(f"Executing agent with message: {message[:50]}...")
-            response = await agent(user_msg)
+            # 创建 Agent 执行工作目录（持久化，不需要清理）
+            import uuid
+            execution_id_str = str(uuid.uuid4())[:8]  # 短 ID
+            work_dir = AGENT_ARTIFACTS_DIR / "working" / execution_id_str
+            work_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created agent work directory: {work_dir}")
+
+            # 保存原始工作目录
+            real_original_cwd = os.getcwd()
+
+            # 切换到工作目录
+            os.chdir(work_dir)
+
+            try:
+                # 执行 Agent（带超时保护）
+                logger.info(f"Executing agent with message: {message[:50]}...")
+                import asyncio
+                response = await asyncio.wait_for(
+                    agent(user_msg),
+                    timeout=120.0  # 120秒超时
+                )
+            except asyncio.TimeoutError:
+                logger.error("Agent execution timeout (120s)")
+                raise Exception("Agent execution timeout: Agent did not respond within 120 seconds")
+            finally:
+                # 恢复原始工作目录
+                os.chdir(real_original_cwd)
 
             execution_time = time.time() - start_time
 
@@ -387,7 +501,11 @@ class AgentExecutor:
                 "execution_time": 0,
             }
         finally:
-            # 清理临时文件
+            # 扫描工作目录中生成的文件（已经在持久化目录中）
+            self._generated_files = self._scan_work_directory(work_dir)
+            logger.info(f"Found {len(self._generated_files)} generated files")
+
+            # 清理技能临时目录（仅 SKILL.md 文件，不影响生成的文件）
             self.skill_registry.cleanup()
 
     def _extract_response_content(self, response) -> str:
@@ -415,6 +533,135 @@ class AgentExecutor:
             output_message = str(response)
 
         return output_message
+
+    def _scan_work_directory(self, work_dir: Path) -> List[Path]:
+        """
+        扫描 Agent 工作目录查找生成的文件
+
+        Args:
+            work_dir: 工作目录路径
+
+        Returns:
+            找到的文件路径列表
+        """
+        generated_files = []
+
+        if not work_dir or not work_dir.exists():
+            logger.warning(f"Work directory not found: {work_dir}")
+            return generated_files
+
+        try:
+            logger.info(f"Scanning work directory: {work_dir}")
+
+            # 遍历工作目录，查找生成的文件
+            for root, dirs, files in os.walk(work_dir):
+                for file in files:
+                    file_path = Path(root) / file
+
+                    # 记录所有文件（用于调试）
+                    logger.info(f"Scanning file: {file_path} (ext: {file_path.suffix})")
+
+                    # 跳过 SKILL.md 和脚本文件
+                    if file_path.name == "SKILL.md":
+                        logger.info(f"Skipping SKILL.md: {file_path}")
+                        continue
+                    if file_path.suffix == '.py':
+                        logger.info(f"Skipping Python file: {file_path}")
+                        continue
+
+                    # 只保留有意义的文件（文档、图片等）
+                    if file_path.suffix in ['.docx', '.pdf', '.xlsx', '.pptx', '.png', '.jpg', '.jpeg', '.gif', '.txt']:
+                        generated_files.append(file_path)
+                        logger.info(f"✓ Found generated file: {file_path}")
+                    else:
+                        logger.info(f"✗ Skipping file with unsupported extension: {file_path}")
+
+            logger.info(f"Found {len(generated_files)} generated files (supported types)")
+        except Exception as e:
+            logger.error(f"Error scanning work directory: {e}")
+
+        return generated_files
+
+    def capture_and_save_artifacts(
+        self,
+        agent_execution_id: int,
+        db: Session,
+    ) -> List[Dict[str, Any]]:
+        """
+        捕获并保存 Agent 执行生成的文件
+
+        注意：此方法必须在 execute() 之后立即调用
+
+        Args:
+            agent_execution_id: Agent 执行 ID
+            db: 数据库会话
+
+        Returns:
+            保存的文件信息列表
+        """
+        if not FILE_SERVICE_AVAILABLE:
+            logger.warning("FileService not available, skipping artifact capture")
+            return []
+
+        # 使用在 execute() 中已经扫描的文件列表
+        generated_files = self._generated_files
+        if not generated_files:
+            logger.info("No generated files found from execution")
+            return []
+
+        logger.info(f"Processing {len(generated_files)} generated files")
+
+        artifacts = []
+        for file_path in generated_files:
+            try:
+                # 文件已经在持久化目录中，直接移动到最终位置
+                file_id = FileService.generate_file_id()
+                file_type = FileService.get_file_extension(file_path.name)
+                mime_type = FileService.get_mime_type(file_path.name)
+                file_size = file_path.stat().st_size
+
+                # 目标路径
+                relative_path = f"agent_artifacts/{agent_execution_id}/{file_id}"
+                dest_path = FileService.BASE_DIR / relative_path
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # 移动文件
+                shutil.move(str(file_path), str(dest_path))
+                logger.info(f"Moved file from {file_path} to {dest_path}")
+
+                # 创建数据库记录
+                from ..db.models import AgentArtifact
+                artifact = AgentArtifact(
+                    agent_execution_id=agent_execution_id,
+                    file_id=file_id,
+                    filename=file_path.name,
+                    file_type=file_type,
+                    file_size=file_size,
+                    mime_type=mime_type,
+                    storage_path=relative_path,
+                )
+
+                db.add(artifact)
+                db.commit()
+                db.refresh(artifact)
+
+                logger.info(f"Saved artifact: {artifact.file_id} - {artifact.filename}")
+                artifacts.append({
+                    "id": artifact.id,
+                    "file_id": artifact.file_id,
+                    "filename": artifact.filename,
+                    "file_type": artifact.file_type,
+                    "file_size": artifact.file_size,
+                    "download_url": f"/api/v1/files/artifacts/{artifact.file_id}/download",
+                    "preview_url": f"/api/v1/files/artifacts/{artifact.file_id}/preview",
+                })
+
+            except Exception as e:
+                logger.error(f"Failed to save artifact {file_path}: {e}")
+                db.rollback()
+
+        logger.info(f"Captured and saved {len(artifacts)} artifacts")
+        return artifacts
 
 
 # 全局执行器实例
