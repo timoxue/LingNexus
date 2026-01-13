@@ -419,6 +419,11 @@ class AgentExecutor:
             work_dir.mkdir(parents=True, exist_ok=True)
             logger.info(f"Created agent work directory: {work_dir}")
 
+            # 记录执行前的文件快照（用于后续对比）
+            skills_dir = framework_dir / "skills"
+            files_before = self._get_files_snapshot(skills_dir)
+            logger.info(f"Recorded {len(files_before)} files before execution")
+
             # 保存原始工作目录
             real_original_cwd = os.getcwd()
 
@@ -501,9 +506,11 @@ class AgentExecutor:
                 "execution_time": 0,
             }
         finally:
-            # 扫描工作目录中生成的文件（已经在持久化目录中）
-            self._generated_files = self._scan_work_directory(work_dir)
-            logger.info(f"Found {len(self._generated_files)} generated files")
+            # 对比执行前后的文件快照，找出新生成的文件
+            files_after = self._get_files_snapshot(skills_dir)
+            new_files = self._find_new_files(files_before, files_after)
+            logger.info(f"Found {len(new_files)} newly generated files")
+            self._generated_files = new_files
 
             # 清理技能临时目录（仅 SKILL.md 文件，不影响生成的文件）
             self.skill_registry.cleanup()
@@ -581,6 +588,63 @@ class AgentExecutor:
             logger.error(f"Error scanning work directory: {e}")
 
         return generated_files
+
+    def _get_files_snapshot(self, directory: Path) -> Dict[str, float]:
+        """
+        获取目录下所有文件的快照（文件路径 -> 修改时间）
+
+        Args:
+            directory: 要扫描的目录
+
+        Returns:
+            字典：{文件路径: 修改时间戳}
+        """
+        snapshot = {}
+        if not directory or not directory.exists():
+            return snapshot
+
+        try:
+            for root, dirs, files in os.walk(directory):
+                for file in files:
+                    file_path = Path(root) / file
+                    # 跳过 SKILL.md 和 Python 脚本文件
+                    if file_path.name == "SKILL.md" or file_path.suffix == '.py':
+                        continue
+                    # 记录文件路径和修改时间
+                    try:
+                        mtime = file_path.stat().st_mtime
+                        snapshot[str(file_path)] = mtime
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning(f"Error creating file snapshot: {e}")
+
+        return snapshot
+
+    def _find_new_files(self, files_before: Dict[str, float], files_after: Dict[str, float]) -> List[Path]:
+        """
+        对比两个快照，找出新增的文件
+
+        Args:
+            files_before: 执行前的文件快照
+            files_after: 执行后的文件快照
+
+        Returns:
+            新增文件路径列表
+        """
+        new_files = []
+        supported_extensions = {'.docx', '.pdf', '.xlsx', '.pptx', '.png', '.jpg', '.jpeg', '.gif', '.txt'}
+
+        for file_path_str, mtime_after in files_after.items():
+            # 如果文件之前不存在，或者是新创建的
+            if file_path_str not in files_before:
+                file_path = Path(file_path_str)
+                # 只保留支持的文件类型
+                if file_path.suffix in supported_extensions:
+                    new_files.append(file_path)
+                    logger.info(f"✓ New file detected: {file_path}")
+
+        return new_files
 
     def capture_and_save_artifacts(
         self,
