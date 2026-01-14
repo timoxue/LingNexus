@@ -431,13 +431,16 @@ class AgentExecutor:
 
             # 保存原始工作目录
             real_original_cwd = os.getcwd()
+            logger.info(f"Original working directory: {real_original_cwd}")
 
             # 切换到工作目录
             os.chdir(work_dir)
+            logger.info(f"Changed to agent work directory: {os.getcwd()}")
 
             try:
                 # 执行 Agent（带超时保护）
                 logger.info(f"Executing agent with message: {message[:50]}...")
+                logger.info(f"Current working directory during execution: {os.getcwd()}")
                 import asyncio
                 response = await asyncio.wait_for(
                     agent(user_msg),
@@ -449,6 +452,7 @@ class AgentExecutor:
             finally:
                 # 恢复原始工作目录
                 os.chdir(real_original_cwd)
+                logger.info(f"Restored working directory: {os.getcwd()}")
 
             execution_time = time.time() - start_time
 
