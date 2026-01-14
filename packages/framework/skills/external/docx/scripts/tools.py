@@ -183,6 +183,20 @@ def list_docx_files():
         return ToolResponse(f"列出文件失败: {str(e)}", error=True)
 
 
+def get_current_directory():
+    """
+    获取当前工作目录
+
+    Returns:
+        ToolResponse: 当前工作目录路径
+    """
+    try:
+        current_dir = Path.cwd()
+        return ToolResponse(f"当前工作目录: {current_dir}")
+    except Exception as e:
+        return ToolResponse(f"获取工作目录失败: {str(e)}", error=True)
+
+
 # 测试代码
 if __name__ == "__main__":
     print("测试 docx 工具...")

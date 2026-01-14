@@ -373,15 +373,20 @@ class AgentExecutor:
             # 构建系统提示词
             if system_prompt is None:
                 skill_names = [s['name'] for s in skills] if skills else []
+                work_dir_str = str(work_dir)  # 将 Path 对象转为字符串
                 system_prompt = f"""你是一个专业的 AI 助手。
 
 **可用技能**: {', '.join(skill_names) if skill_names else '无'}
 
+**当前工作目录**: {work_dir_str}
+**重要**: 所有生成的文件都应该保存在当前工作目录中！
+
 **重要提示**:
 1. 如果用户要求创建文档、文件等，请直接使用对应的工具函数，不要只是解释步骤
 2. 例如：创建 docx 文档时，直接调用 create_new_docx(filename="xxx.docx")
-3. 不要重复调用 load_skill_instructions，一次就足够了
-4. 你的目标是完成任务，而不是只是描述如何完成任务
+3. 文件会自动保存在当前工作目录: {work_dir_str}
+4. 不要重复调用 load_skill_instructions，一次就足够了
+5. 你的目标是完成任务，而不是只是描述如何完成任务
 
 请根据用户的需求，直接使用合适的工具来完成任务。
 """
