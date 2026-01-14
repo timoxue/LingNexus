@@ -179,6 +179,13 @@
             <h5>错误:</h5>
             <div class="message-box error">{{ executeResult.error_message }}</div>
           </div>
+
+          <!-- 生成的文件 -->
+          <ArtifactList
+            v-if="executeResult.artifacts && executeResult.artifacts.length > 0"
+            :artifacts="executeResult.artifacts"
+            class="artifact-section"
+          />
         </div>
       </div>
 
@@ -251,6 +258,7 @@ import { useAgentsStore } from '@/stores'
 import { ElMessage } from 'element-plus'
 import { VideoPlay, Edit, Refresh } from '@element-plus/icons-vue'
 import type { AgentExecution } from '@/api/agents'
+import ArtifactList from '@/components/ArtifactList.vue'
 
 const route = useRoute()
 const agentsStore = useAgentsStore()

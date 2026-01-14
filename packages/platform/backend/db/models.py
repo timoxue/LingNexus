@@ -65,6 +65,12 @@ class User(Base):
     skill_ratings: Mapped[list["SkillRating"]] = relationship(
         "SkillRating", back_populates="user", cascade="all, delete-orphan"
     )
+    files: Mapped[list["UserFile"]] = relationship(
+        "UserFile", back_populates="user", cascade="all, delete-orphan"
+    )
+    folders: Mapped[list["UserFolder"]] = relationship(
+        "UserFolder", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Skill(Base):
@@ -300,3 +306,165 @@ class SkillRating(Base):
 
     # 唯一约束：同一个 user 和 skill 的组合只能有一条评分记录
     __table_args__ = (Index("idx_user_skill_rating", "user_id", "skill_id", unique=True),)
+
+
+class AgentArtifact(Base):
+    """Agent 执行生成的文件"""
+    __tablename__ = "agent_artifacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    # 关联
+    agent_execution_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("agent_executions.id"), nullable=False
+    )
+    skill_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("skills.id")
+    )
+
+    # 文件基本信息
+    file_id: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, index=True  # f_xxxxx
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    original_filename: Mapped[Optional[str]] = mapped_column(String(255))  # 用户指定的文件名
+
+    # 文件元数据
+    file_type: Mapped[str] = mapped_column(String(50), nullable=False)  # docx, pdf, xlsx
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # 存储路径
+    storage_path: Mapped[str] = mapped_column(String(500), nullable=False)
+
+    # 分类和描述
+    category: Mapped[str] = mapped_column(String(50), default="document")  # document, image, data, other
+    description: Mapped[Optional[str]] = mapped_column(Text)
+
+    # 访问统计
+    access_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_accessed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
+
+    # 状态
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
+
+    # 时间戳
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+    # 关系
+    execution: Mapped["AgentExecution"] = relationship(
+        "AgentExecution", backref="artifacts"
+    )
+    skill: Mapped[Optional["Skill"]] = relationship("Skill")
+
+    # 索引
+    __table_args__ = (
+        Index("idx_execution_artifact", "agent_execution_id"),
+        Index("idx_file_id", "file_id"),
+        Index("idx_session_file", "agent_execution_id", "is_deleted"),
+    )
+
+
+class UserFile(Base):
+    """用户上传的文件"""
+    __tablename__ = "user_files"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    # 用户关联
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    folder_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("user_folders.id")
+    )
+
+    # 文件基本信息
+    file_id: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, index=True  # f_xxxxx
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # 文件元数据
+    file_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # 存储路径
+    storage_path: Mapped[str] = mapped_column(String(500), nullable=False)
+
+    # 描述和标签
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    tags: Mapped[Optional[str]] = mapped_column(String(500))  # JSON 数组
+
+    # 访问统计
+    access_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_accessed_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
+
+    # 状态
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
+
+    # 时间戳
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow
+    )
+
+    # 关系
+    user: Mapped["User"] = relationship("User", back_populates="files")
+    folder: Mapped[Optional["UserFolder"]] = relationship("UserFolder", backref="files")
+
+    # 索引
+    __table_args__ = (
+        Index("idx_user_file", "user_id", "is_deleted"),
+        Index("idx_folder_file", "folder_id"),
+    )
+
+
+class UserFolder(Base):
+    """用户文件夹"""
+    __tablename__ = "user_folders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    # 用户关联
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    parent_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("user_folders.id")
+    )
+
+    # 文件夹信息
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+
+    # 路径（用于快速查询）
+    path: Mapped[str] = mapped_column(String(1000), nullable=False)  # /根文件夹/子文件夹
+
+    # 排序
+    order: Mapped[int] = mapped_column(Integer, default=0)
+
+    # 状态
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
+
+    # 时间戳
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow
+    )
+
+    # 关系
+    user: Mapped["User"] = relationship("User", back_populates="folders")
+    parent: Mapped[Optional["UserFolder"]] = relationship(
+        "UserFolder", remote_side=[id], backref="children"
+    )
+
+    # 索引
+    __table_args__ = (
+        Index("idx_user_folder", "user_id", "parent_id", "is_deleted"),
+        Index("idx_path", "path"),
+    )

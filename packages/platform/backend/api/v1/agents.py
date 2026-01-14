@@ -375,6 +375,21 @@ async def execute_agent(
         db.commit()
         db.refresh(execution)
 
+        # ==================== 捕获生成的文件 ====================
+        artifacts = []
+        if result["status"] == "success":
+            try:
+                from services.agent_service import _executor
+                artifacts = _executor.capture_and_save_artifacts(
+                    agent_execution_id=execution.id,
+                    db=db,
+                )
+                print(f"[INFO] Captured {len(artifacts)} artifacts from agent execution")
+            except Exception as e:
+                print(f"[WARNING] Failed to capture artifacts: {e}")
+                import traceback
+                traceback.print_exc()
+
         return AgentExecuteResponse(
             execution_id=execution.id,
             status=execution.status,
@@ -382,6 +397,7 @@ async def execute_agent(
             error_message=execution.error_message,
             tokens_used=execution.tokens_used,
             execution_time=execution.execution_time,
+            artifacts=artifacts,  # 添加 artifacts 字段
         )
 
     except Exception as e:

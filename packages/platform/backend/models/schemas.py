@@ -3,7 +3,7 @@ Pydantic 模型：用于请求和响应的数据验证
 """
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
@@ -224,6 +224,7 @@ class AgentExecuteResponse(BaseModel):
     error_message: Optional[str] = None
     tokens_used: Optional[int] = None
     execution_time: Optional[float] = None
+    artifacts: Optional[List[Dict[str, Any]]] = []  # Agent 生成的文件列表
 
 
 # ==================== 代理执行相关 ====================
@@ -314,3 +315,122 @@ class ClinicalTrialListParams(BaseModel):
     status: Optional[str] = None
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
+
+
+# ==================== 文件管理相关 ====================
+
+class AgentArtifactBase(BaseModel):
+    """Agent 生成文件基础模型"""
+    filename: str
+    original_filename: Optional[str] = None
+    file_type: str
+    file_size: int
+    mime_type: str
+    category: str = "document"
+    description: Optional[str] = None
+
+
+class AgentArtifactCreate(AgentArtifactBase):
+    """创建 Agent 生成文件"""
+    agent_execution_id: int
+    skill_id: Optional[int] = None
+    storage_path: str
+    file_id: str
+
+
+class AgentArtifactResponse(AgentArtifactBase):
+    """Agent 生成文件响应"""
+    id: int
+    file_id: str
+    agent_execution_id: int
+    skill_id: Optional[int] = None
+    storage_path: str
+    access_count: int
+    last_accessed_at: Optional[datetime] = None
+    created_at: datetime
+
+    # 下载和预览 URL
+    download_url: Optional[str] = None
+    preview_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserFileBase(BaseModel):
+    """用户文件基础模型"""
+    filename: str
+    file_type: str
+    file_size: int
+    mime_type: str
+    description: Optional[str] = None
+    tags: Optional[str] = None
+
+
+class UserFileCreate(UserFileBase):
+    """创建用户文件"""
+    folder_id: Optional[int] = None
+    storage_path: str
+    file_id: str
+
+
+class UserFileUpdate(BaseModel):
+    """更新用户文件"""
+    filename: Optional[str] = None
+    description: Optional[str] = None
+    tags: Optional[str] = None
+    folder_id: Optional[int] = None
+
+
+class UserFileResponse(UserFileBase):
+    """用户文件响应"""
+    id: int
+    file_id: str
+    user_id: int
+    folder_id: Optional[int] = None
+    storage_path: str
+    access_count: int
+    last_accessed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    # 下载和预览 URL
+    download_url: Optional[str] = None
+    preview_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserFolderBase(BaseModel):
+    """用户文件夹基础模型"""
+    name: str
+    description: Optional[str] = None
+    parent_id: Optional[int] = None
+    order: int = 0
+
+
+class UserFolderCreate(UserFolderBase):
+    """创建用户文件夹"""
+    path: str
+
+
+class UserFolderUpdate(BaseModel):
+    """更新用户文件夹"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    parent_id: Optional[int] = None
+    order: Optional[int] = None
+
+
+class UserFolderResponse(UserFolderBase):
+    """用户文件夹响应"""
+    id: int
+    user_id: int
+    path: str
+    created_at: datetime
+    updated_at: datetime
+
+    # 文件和子文件夹数量
+    file_count: int = 0
+    folder_count: int = 0
+
+    model_config = ConfigDict(from_attributes=True)

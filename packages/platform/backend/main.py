@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from db import init_db
-from api.v1 import auth, skills, agents, monitoring, marketplace
+from api.v1 import auth, skills, agents, monitoring, marketplace, files
 from core.errors import LingNexusException, create_error_response
 from core.rate_limit import limiter, rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -51,6 +51,10 @@ async def lifespan(app: FastAPI):
     # 启动时初始化数据库
     init_db()
 
+    # 导入配置并显示
+    from core.config import get_config_summary
+    config = get_config_summary()
+
     # 显示启动信息和 AgentScope Studio 地址
     studio_enabled = os.getenv("AGENTSCOPE_STUDIO_ENABLED", "true").lower() == "true"
     logger.info("=" * 60)
@@ -58,14 +62,20 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     logger.info("API Documentation: http://localhost:8000/docs")
     logger.info("API Redoc:        http://localhost:8000/redoc")
+    logger.info("")
+    logger.info("File Storage Configuration:")
+    logger.info(f"  Artifacts Dir:    {config['artifacts_dir']}")
+    logger.info(f"  User Files Dir:   {config['user_files_dir']}")
+    logger.info(f"  Agent Artifacts:  {config['agent_artifacts_dir']}")
+    logger.info(f"  Agent Work Dir:   {config['agent_work_dir']}")
+    logger.info(f"  Max File Size:    {config['max_file_size'] / 1024 / 1024:.0f}MB")
+    logger.info("")
 
     if studio_enabled:
-        logger.info("")
         logger.info("AgentScope Studio: http://localhost:3000")
         logger.info("  Studio 会自动在第一次 agent 调用时启动")
         logger.info("  你可以在浏览器中打开 Studio 查看 agent 执行过程")
     else:
-        logger.info("")
         logger.info("AgentScope Studio: Disabled (set AGENTSCOPE_STUDIO_ENABLED=true to enable)")
 
     logger.info("=" * 60)
@@ -216,6 +226,7 @@ app.include_router(skills.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(monitoring.router, prefix="/api/v1")
 app.include_router(marketplace.router, prefix="/api/v1")
+app.include_router(files.router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
