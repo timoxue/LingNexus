@@ -10,7 +10,8 @@ from jose import JWTError, jwt
 # JWT 配置
 SECRET_KEY = "your-secret-key-change-this-in-production"  # 生产环境应从环境变量读取
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# Token 有效期：7 天（方便开发使用，生产环境建议使用 refresh token 机制）
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 天
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

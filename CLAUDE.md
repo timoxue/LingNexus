@@ -23,7 +23,7 @@ LingNexus/
 │   │   ├── tests/              # Framework tests
 │   │   └── pyproject.toml      # Package config
 │   │
-│   └── platform/              # Platform package (v1.0.0)
+│   └── platform/              # Platform package (v1.0.2)
 │       ├── backend/           # FastAPI backend
 │       └── frontend/          # Vue 3 frontend
 │
@@ -447,11 +447,13 @@ packages/platform/
 ├── backend/                    # FastAPI Backend
 │   ├── api/
 │   │   └── v1/
-│   │       ├── auth.py         # Authentication endpoints
-│   │       ├── skills.py       # Skills CRUD
-│   │       ├── agents.py       # Agents CRUD & execution
-│   │       ├── monitoring.py   # Monitoring data
-│   │       └── marketplace.py  # Skills Marketplace ⭐
+│   │       ├── auth.py                 # Authentication endpoints
+│   │       ├── skills.py               # Skills CRUD
+│   │       ├── agents.py               # Agents CRUD & execution
+│   │       ├── monitoring.py           # Monitoring data
+│   │       ├── marketplace.py          # Skills Marketplace
+│   │       ├── skill_creator_agent.py  # Skill Creator Agent API
+│   │       └── files.py                # File management
 │   ├── core/
 │   │   ├── security.py         # JWT + password hashing
 │   │   └── deps.py            # Dependencies (auth, etc.)
@@ -461,7 +463,8 @@ packages/platform/
 │   ├── models/
 │   │   └── schemas.py         # Pydantic schemas
 │   ├── services/
-│   │   └── agent_service.py   # Agent execution service
+│   │   ├── agent_service.py               # Agent execution service
+│   │   └── skill_creator_agent_service.py  # AI-driven skill creation
 │   └── main.py               # FastAPI app entry point
 │
 └── frontend/                   # Vue 3 Frontend
@@ -556,6 +559,113 @@ Access control based on `sharing_scope`:
 - **`public`**: Anyone can access (no login required)
 - **`team`**: Only same department users or creator
 - **`private`**: Only creator
+
+### Skill Creator Features
+
+**Overview**:
+AI 驱动的技能创建助手，通过 4 维度渐进式问答帮助用户快速创建符合 AgentScope/Claude Skills 标准的技能。
+
+**Backend API Endpoints** (`/api/v1/skill-creator-agent/`):
+
+```python
+# POST /skill-creator-agent/session/create - Create new session
+# Body: { use_api_key: bool }
+# Returns: { session_id, current_dimension, dimension_name, question, ... }
+
+# POST /skill-creator-agent/chat - Chat with agent
+# Body: { session_id: str, message: str }
+# Returns: { type, score, reasoning, follow_up_question, ... }
+
+# GET /skill-creator-agent/session/{session_id} - Get session status
+# Returns: { session_id, current_dimension, progress, ... }
+
+# POST /skill-creator-agent/session/{session_id}/save-skill - Save skill to DB
+# Returns: { skill_id, skill_name, message }
+```
+
+**4 Dimensions Progressive Disclosure**:
+
+1. **Core Value (核心价值)** - 评分标准 (100 分):
+   - 是否明确解决什么问题？(20 分)
+   - 能否识别目标用户？(20 分)
+   - 能否推断出类别？(20 分)
+   - 表达是否清晰？(20 分)
+   - 是否有明确的调用触发词？(20 分)
+
+2. **Usage Scenario (使用场景)** - 评分标准 (100 分):
+   - 是否有具体的使用场景？(25 分)
+   - 是否知道输入是什么？(25 分)
+   - 是否知道输出是什么？(25 分)
+   - 是否有使用频率？(25 分)
+
+3. **Alias Preference (别名偏好)** - 评分标准 (100 分):
+   - 是否够简短（2-5 个字）？(40 分)
+   - 是否符合自然语言习惯？(30 分)
+   - 是否包含准确的功能词？(30 分)
+
+4. **Boundaries & Resources (边界资源)** - 评分标准 (100 分):
+   - 是否明确不做什么？(30 分)
+   - 是否识别必要的 scripts/references/assets？(30 分)
+   - 是否知道自由度（high/medium/low）？(20 分)
+   - 是否知道不接受什么输入？(20 分)
+
+**LLM Scoring System**:
+
+- **评分 ≥ 91**: 信息充足，进入下一维度
+- **评分 < 91**: 信息不足，智能追问并生成 3-5 个推荐选项
+- **评分 = 0**: 发生错误，返回友好提示
+
+**Response Format**:
+
+```json
+// 进入下一维度
+{
+  "type": "next_dimension",
+  "score": 92,
+  "reasoning": "评分理由"
+}
+
+// 追问用户
+{
+  "type": "follow_up",
+  "score": 65,
+  "reasoning": "评分理由",
+  "follow_up_question": "追问的问题",
+  "recommended_options": [
+    {"id": "opt1", "text": "推荐选项1"},
+    {"id": "opt2", "text": "推荐选项2"}
+  ]
+}
+
+// 完成总结
+{
+  "type": "summary",
+  "message": "总结信息",
+  "skill_metadata": {
+    "skill_name": "kebab-case-name",
+    "main_alias": "主别名",
+    "context_aliases": ["别名1", "别名2"],
+    "category": "类别",
+    "target_users": ["目标用户"],
+    "suggested_capabilities": [...]
+  }
+}
+```
+
+**AgentScope Studio Integration**:
+
+- 项目名称: `LingNexus-SkillCreator`
+- Studio URL: `http://localhost:3000`
+- 实时监控 LLM 对话和评分过程
+- 可视化 Agent 思考链
+- 调试和优化系统提示词
+
+**Key Files**:
+
+- `packages/framework/lingnexus/react_agent.py` - Agent creation and system prompt
+- `packages/platform/backend/services/skill_creator_agent_service.py` - Agent service
+- `packages/platform/frontend/src/views/SkillCreatorView.vue` - Main UI component
+- `packages/platform/frontend/src/api/skillCreator.ts` - API client (simplified, 152 lines)
 
 ### Platform Development Commands
 
@@ -851,6 +961,69 @@ For more information, see:
 - `docs/development/architecture.md` - System architecture
 
 ## Version History
+
+### v1.0.2 (2025-01-19)
+
+**Platform Features**:
+- ✨ Skill Creator Agent
+  - AI 驱动的技能创建助手
+  - 4 维度渐进式问答流程（核心价值、使用场景、别名偏好、边界限制）
+  - LLM 智能评分系统（0-100 分，≥91 通过）
+  - 自动生成技能元数据（名称、类别、别名、目标用户、建议能力）
+  - 智能追问机制（评分<91 时生成 3-5 个推荐选项）
+  - AgentScope Studio 集成（实时监控 LLM 对话）
+- ✨ 完整的前端界面
+  - 渐进式问答 UI
+  - 实时评分展示
+  - 进度追踪（0% → 25% → 50% → 75% → 100%）
+  - 技能元数据预览和保存
+- 🔧 端口配置优化
+  - 后端恢复到 8000 端口
+  - 前端使用 5173 端口
+  - Vite 代理配置更新
+
+**Code Cleanup**:
+- 🧹 删除旧版 Skill Creator 系统（~2,400 行代码）
+  - `packages/platform/backend/api/v1/skill_creator.py` (301 行)
+  - `packages/platform/backend/services/skill_creator_service.py` (705 行)
+  - `packages/platform/frontend/src/components/skill-creator/` 目录（7 个未使用组件）
+  - `packages/platform/frontend/src/stores/skillCreator.ts` (未使用的 store)
+- ✨ 简化 API 客户端
+  - `skillCreator.ts` 从 372 行精简到 152 行
+  - 移除所有旧系统 API 函数
+  - 只保留 Agent-based API
+- ✨ 统一架构
+  - 单一 Agent 驱动的技能创建系统
+  - 更清晰的代码结构
+  - 更易于维护和扩展
+- 🎁 清理项目结构
+  - 删除嵌套的空目录 `packages/packages/`
+  - 项目目录结构更清晰
+
+**Technical Implementation**:
+- 🤖 ReActAgent 创建和配置
+  - Toolkit 注册（confirm_information、request_more_info）
+  - 温度优化（0.4 → 0.1 提高准确性）
+  - JSON 响应格式强制要求
+- 📊 响应解析系统
+  - ContentBlock 格式提取
+  - 多层次 JSON 解析（代码块、对象、直接解析）
+  - 完善的错误处理和日志
+- 🔗 AgentScope Studio 集成
+  - 项目名称: LingNexus-SkillCreator
+  - Studio URL: http://localhost:3000
+  - 实时对话和评分监控
+
+**Documentation Updates**:
+- 📝 更新 README.md（Skill Creator 功能说明）
+- 📝 更新 CLAUDE.md（详细的 API 文档和评分标准）
+- 📝 添加版本历史（v1.0.2）
+
+**Bug Fixes**:
+- 🐛 修复 JSON 响应解析问题（正确提取 ContentBlock 中的 text 字段）
+- 🐛 修复 Msg 构造函数缺少 role 参数
+- 🐛 修复认证绕过导入问题
+- 🐛 优化前端端口配置（5174 → 5173）
 
 ### v1.0.1 (2025-01-12)
 

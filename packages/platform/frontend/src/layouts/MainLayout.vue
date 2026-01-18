@@ -24,6 +24,10 @@
           <el-icon><Files /></el-icon>
           <template #title>技能管理</template>
         </el-menu-item>
+        <el-menu-item index="/skill-creator">
+          <el-icon><MagicStick /></el-icon>
+          <template #title>技能创建器</template>
+        </el-menu-item>
         <el-menu-item index="/agents">
           <el-icon><User /></el-icon>
           <template #title>代理管理</template>
@@ -84,6 +88,7 @@ import {
   Fold,
   Expand,
   UserFilled,
+  MagicStick,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -97,7 +102,8 @@ const isCollapse = ref(false)
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/marketplace')) return '/marketplace'
-  if (path.startsWith('/skills')) return '/skills'
+  if (path.startsWith('/skills') && !path.startsWith('/skill-creator')) return '/skills'
+  if (path.startsWith('/skill-creator')) return '/skill-creator'
   if (path.startsWith('/agents')) return '/agents'
   if (path.startsWith('/monitoring')) return '/monitoring'
   return '/'

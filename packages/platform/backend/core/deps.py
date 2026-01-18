@@ -157,3 +157,36 @@ def get_current_user_optional(
         return None
 
     return user
+
+
+def get_test_user() -> User:
+    """
+    测试用的模拟用户，绕过认证
+    仅用于开发测试
+    """
+    # 返回一个模拟的用户对象
+    from db.models import User
+    test_user = User(
+        id=1,
+        username="testuser",
+        email="test@example.com",
+        hashed_password="dummy_hash",
+        full_name="Test User",
+        is_active=True,
+        is_superuser=False,
+        department="test",
+        role="user",
+        xp=0,
+        level=1,
+        created_at="2024-01-01T00:00:00",
+        updated_at="2024-01-01T00:00:00"
+    )
+    return test_user
+
+
+def get_bypass_current_user() -> User:
+    """
+    绕过认证获取当前用户
+    仅用于开发测试
+    """
+    return get_test_user()

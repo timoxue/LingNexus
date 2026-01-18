@@ -372,24 +372,36 @@ Role (角色)
 **API 设计**:
 ```
 /api/v1/
-├── auth/                    # 认证
+├── auth/                       # 认证
 │   ├── POST /register
 │   ├── POST /login
 │   └── GET  /me
-├── skills/                  # Skills
+├── skills/                     # Skills
 │   ├── GET    /skills
 │   ├── POST   /skills
 │   ├── GET    /skills/{id}
 │   ├── PUT    /skills/{id}
 │   └── DELETE /skills/{id}
-├── agents/                  # Agents
+├── agents/                     # Agents
 │   ├── GET    /agents
 │   ├── POST   /agents
 │   ├── POST   /agents/{id}/run
 │   └── GET    /agents/{id}/logs
-└── admin/                   # 管理员
-    ├── GET    /audit-logs
-    └── PUT    /users/{id}/role
+├── marketplace/                # Skills Marketplace
+│   ├── GET    /marketplace/skills
+│   ├── GET    /marketplace/skills/{id}
+│   ├── POST   /marketplace/skills/{id}/try
+│   ├── POST   /marketplace/skills/{id}/create-agent
+│   └── POST   /marketplace/skills/{id}/rate
+├── skill-creator-agent/        # AI-driven Skill Creator
+│   ├── POST   /skill-creator-agent/session/create
+│   ├── POST   /skill-creator-agent/chat
+│   ├── GET    /skill-creator-agent/session/{id}
+│   └── POST   /skill-creator-agent/session/{id}/save-skill
+└── files/                      # File Management
+    ├── GET    /files
+    ├── POST   /files/upload
+    └── GET    /files/{id}/download
 ```
 
 ### Frontend 架构
@@ -401,7 +413,10 @@ src/
 │   ├── client.ts            # Axios 实例
 │   ├── auth.ts
 │   ├── skills.ts
-│   └── agents.ts
+│   ├── agents.ts
+│   ├── marketplace.ts       # Marketplace API
+│   ├── skillCreator.ts      # Skill Creator API (Agent-based)
+│   └── files.ts             # File management API
 ├── components/              # 通用组件
 │   ├── common/              # Header, Footer, Loading
 │   ├── skill/               # SkillCard, SkillEditor
@@ -411,11 +426,14 @@ src/
 │   ├── Auth/                # Login, Register
 │   ├── Skills/              # SkillList, SkillDetail, SkillEdit
 │   ├── Agents/              # AgentList, AgentBuilder
+│   ├── Marketplace/         # Skills Marketplace
+│   ├── SkillCreator/        # AI-driven Skill Creator
 │   └── Dashboard/           # Overview
 ├── stores/                  # Pinia 状态管理
 │   ├── auth.ts
 │   ├── skill.ts
-│   └── agent.ts
+│   ├── agent.ts
+│   └── marketplace.ts
 └── router/                  # Vue Router
     └── index.ts
 ```

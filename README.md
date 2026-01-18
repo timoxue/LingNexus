@@ -40,7 +40,7 @@ LingNexus/
 │   │   ├── tests/              # Framework 测试
 │   │   └── pyproject.toml      # 包配置
 │   │
-│   └── platform/              # Platform 包（v1.0.0）
+│   └── platform/              # Platform 包（v1.0.2）
 │       ├── backend/           # FastAPI 后端
 │       └── frontend/          # Vue 3 前端
 │
@@ -51,6 +51,8 @@ LingNexus/
 ```
 
 ## 🚀 快速开始
+
+> 💡 **新用户？** 查看 [START_GUIDE.md](START_GUIDE.md) 获取详细的一键启动指南
 
 ### 1. 安装依赖
 
@@ -112,20 +114,23 @@ uv run python -m lingnexus.cli search "GLP-1"
 #### 启动服务
 
 ```bash
-# 后端（确保先同步依赖）
-cd D:/internal/LingNexus
-uv sync
-
+# 后端（端口 8000）
 cd packages/platform/backend
-uv run uvicorn main:app --reload --port 8000
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-# 前端（新终端窗口）
+# 前端（端口 5173，新终端窗口）
 cd packages/platform/frontend
 npm install
 npm run dev
 ```
 
-访问 `http://localhost:5173` 开始使用 Platform。
+**访问地址**:
+- 前端界面: http://localhost:5173
+- 后端 API: http://localhost:8000
+- API 文档: http://localhost:8000/docs
+- AgentScope Studio: http://localhost:3000（自动启动）
+
+📖 **详细启动指南**: [START_GUIDE.md](START_GUIDE.md)
 
 #### Platform 功能
 
@@ -164,6 +169,26 @@ npm run dev
 - 🔄 从 Framework 自动导入技能
 - 📊 同步统计（创建、更新、跳过）
 - ⚙️ 管理员专属功能
+
+**技能创建器** (`/skill-creator`):
+- 🤖 AI 驱动的技能创建助手（唯一版本）
+- 📝 4 维度渐进式问答流程
+  - 核心价值：技能解决什么问题
+  - 使用场景：典型工作流程
+  - 别名偏好：简洁自然的调用方式
+  - 边界限制：明确技能的适用范围
+- 🎯 LLM 智能评分系统（0-100 分）
+  - 评分 ≥ 91：进入下一维度
+  - 评分 < 91：智能追问并提供建议
+- 📊 自动生成技能元数据
+  - 技能名称、类别、别名
+  - 目标用户、建议能力
+  - 合规要求、资源清单
+- 🔗 AgentScope Studio 集成
+  - 实时监控 LLM 对话
+  - 可视化评分过程
+  - 调试和优化提示词
+- 🧹 **代码优化**：清理了 ~2,400 行未使用代码
 
 ## 📚 文档
 
@@ -328,6 +353,36 @@ uv run python -m lingnexus.cli monitor --project "司美格鲁肽"
 3. 创建 API Key
 
 ## 📝 更新日志
+
+### v1.0.2 (2025-01-19)
+
+**Platform 新功能**：
+- ✨ Skill Creator Agent
+  - AI 驱动的技能创建助手
+  - 4 维度渐进式问答流程
+  - LLM 智能评分系统（0-100 分）
+  - 自动生成技能元数据
+  - AgentScope Studio 集成
+- 🔧 端口配置优化
+  - 后端：8000 端口
+  - 前端：5173 端口
+
+**代码优化**：
+- 🧹 删除旧版 Skill Creator 系统（~2,400 行代码）
+  - 后端：`skill_creator.py` (301 行)、`skill_creator_service.py` (705 行)
+  - 前端：7 个未使用组件、1 个未使用的 store
+- ✨ 简化 API 客户端
+  - `skillCreator.ts` 从 372 行精简到 152 行
+  - 统一为 Agent 驱动的单一系统
+- 🎁 清理项目结构
+  - 删除嵌套的空目录 `packages/packages/`
+  - 更清晰的代码架构
+
+**技术改进**：
+- 🐛 修复 JSON 响应解析问题（ContentBlock 格式提取）
+- 🐛 优化 ReActAgent 配置（温度 0.4 → 0.1）
+- 🐛 修复 Msg 构造函数缺少 role 参数
+- 📝 完善文档和 API 说明
 
 ### v1.0.1 (2025-01-12)
 

@@ -433,4 +433,17 @@ class UserFolderResponse(UserFolderBase):
     file_count: int = 0
     folder_count: int = 0
 
-    model_config = ConfigDict(from_attributes=True)
+
+# ==================== Skill Creator 相关 ====================
+
+class AliasParameter(BaseModel):
+    """别名参数定义"""
+    name: str
+    type: str = Field(..., pattern="^(string|number|boolean|array)$")
+    required: bool = True
+    description: str
+    default: Optional[Any] = None
+    enum: Optional[List[str]] = None
+
+
+

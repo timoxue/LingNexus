@@ -94,9 +94,12 @@ vitest.config.ts
 *.spec.ts
 
 # Temporary and development notes
-*_SUMMARY.md
-*_GUIDE.md
 QUICKSTART.md
 IMPROVEMENT*.md
 debug_*.html
 create_admin.py
+nul
+test_req.json
+request.json
+.gitignore
+.gitignore

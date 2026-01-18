@@ -60,6 +60,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/SkillDetailView.vue'),
       },
       {
+        path: 'skill-creator',
+        name: 'SkillCreator',
+        component: () => import('@/views/SkillCreatorView.vue'),
+      },
+      {
         path: 'agents',
         name: 'Agents',
         component: () => import('@/views/AgentsView.vue'),

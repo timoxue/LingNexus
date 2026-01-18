@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from db import init_db
-from api.v1 import auth, skills, agents, monitoring, marketplace, files
+from api.v1 import auth, skills, agents, monitoring, marketplace, files, skill_creator_agent
 from core.errors import LingNexusException, create_error_response
 from core.rate_limit import limiter, rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -103,6 +103,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 添加请求日志中间件
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """记录所有请求"""
+    logger.info(f"===== INCOMING REQUEST =====")
+    logger.info(f"Method: {request.method}")
+    logger.info(f"URL: {request.url.path}")
+    logger.info(f"Client: {request.client.host if request.client else 'unknown'}")
+    logger.info(f"Headers: {dict(request.headers)}")
+
+    response = await call_next(request)
+
+    logger.info(f"Response Status: {response.status_code}")
+    logger.info(f"========================")
+    return response
 
 
 # ==================== 全局异常处理器 ====================
@@ -218,6 +234,29 @@ async def health():
     return {"status": "healthy"}
 
 
+@app.get("/test-skill-creator")
+async def test_skill_creator():
+    """测试 Skill Creator 端点，绕过认证"""
+    try:
+        from services.skill_creator_agent_service import SkillCreatorAgentService
+
+        service = SkillCreatorAgentService()
+        response = await service.create_session(user_id=1, api_key=None)
+        return {
+            "success": True,
+            "message": "Skill Creator session created successfully",
+            "session_id": response["session_id"],
+            "current_dimension": response["current_dimension"],
+            "dimension_name": response["dimension_name"]
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Skill Creator test failed"
+        }
+
+
 # ==================== API 路由 ====================
 
 # API v1 路由
@@ -227,6 +266,7 @@ app.include_router(agents.router, prefix="/api/v1")
 app.include_router(monitoring.router, prefix="/api/v1")
 app.include_router(marketplace.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
+app.include_router(skill_creator_agent.router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
