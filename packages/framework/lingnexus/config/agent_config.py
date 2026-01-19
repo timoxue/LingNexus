@@ -56,20 +56,42 @@ def init_agentscope(
     """
     logger.info(f"Initializing AgentScope with project='{project}', studio_url='{studio_url}'")
 
-    agentscope.init(
-        project=project,
-        name=name,
-        run_id=run_id,
-        logging_path=logging_path,
-        logging_level=logging_level,
-        studio_url=studio_url,
-        tracing_url=tracing_url,
-    )
-
-    logger.info(f"AgentScope initialized successfully")
-    if studio_url:
-        logger.info(f"AgentScope Studio monitoring enabled at: {studio_url}")
-        logger.info(f"Project name in Studio: {project}")
-    else:
-        logger.warning(f"AgentScope Studio monitoring DISABLED (studio_url=None)")
+    try:
+        agentscope.init(
+            project=project,
+            name=name,
+            run_id=run_id,
+            logging_path=logging_path,
+            logging_level=logging_level,
+            studio_url=studio_url,
+            tracing_url=tracing_url,
+        )
+        logger.info(f"AgentScope initialized successfully")
+        if studio_url:
+            logger.info(f"AgentScope Studio monitoring enabled at: {studio_url}")
+            logger.info(f"Project name in Studio: {project}")
+        else:
+            logger.warning(f"AgentScope Studio monitoring DISABLED (studio_url=None)")
+    except Exception as e:
+        # Studio 连接失败时，给出警告但继续运行（不使用 Studio）
+        if "localhost:3000" in str(e) or "Max retries exceeded" in str(e):
+            logger.warning(f"AgentScope Studio connection failed: {e}")
+            logger.warning(f"Continuing without Studio monitoring...")
+            logger.warning(f"To fix this:")
+            logger.warning(f"  1. Start Studio: agentscope-studio start")
+            logger.warning(f"  2. Or disable Studio: init_agentscope(studio_url=None)")
+            # 重新初始化，但不使用 Studio
+            agentscope.init(
+                project=project,
+                name=name,
+                run_id=run_id,
+                logging_path=logging_path,
+                logging_level=logging_level,
+                studio_url=None,  # 禁用 Studio
+                tracing_url=tracing_url,
+            )
+            logger.info(f"AgentScope initialized successfully (Studio disabled)")
+        else:
+            # 其他错误直接抛出
+            raise
 
