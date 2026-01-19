@@ -13,12 +13,17 @@ from sqlalchemy.orm import Session
 
 from db.session import get_db
 from db.models import User
-from core.deps import get_current_active_user, get_bypass_current_user
+from core.deps import get_current_user_optional
 from services.skill_creator_agent_service import get_skill_creator_agent_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/skill-creator-agent", tags=["Skill Creator Agent"])
+
+# 环境变量：是否启用免认证模式（开发/测试环境）
+ALLOW_ANONYMOUS_SKILL_CREATION = os.getenv("ALLOW_ANONYMOUS_SKILL_CREATION", "false").lower() == "true"
+
+logger.info(f"Skill Creator anonymous mode: {ALLOW_ANONYMOUS_SKILL_CREATION}")
 
 
 @router.get("/test")
@@ -41,13 +46,13 @@ class ChatRequest(BaseModel):
 @router.post("/session/create")
 async def create_session(
     request: CreateSessionRequest,
-    # Temporarily bypass authentication for testing
-    # current_user: User = Depends(get_current_active_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ) -> Any:
     """
     创建新的 Skill Creator Agent 会话
 
-    返回第一个问题，开始渐进式愿景定义流程
+    - 未登录用户可以试用（创建会话和对话）
+    - 保存技能时需要登录（或自动注册）
 
     Returns:
         会话信息和第一个问题
@@ -55,6 +60,15 @@ async def create_session(
     try:
         logger.info(f"===== CREATE SESSION REQUEST =====")
         logger.info(f"Request: use_api_key={request.use_api_key}")
+        logger.info(f"User: {current_user.username if current_user else 'Anonymous'}")
+        logger.info(f"Anonymous mode: {ALLOW_ANONYMOUS_SKILL_CREATION}")
+
+        # 生产环境：未登录用户提示需要登录
+        if not ALLOW_ANONYMOUS_SKILL_CREATION and not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="请先登录后再创建技能",
+            )
 
         service = get_skill_creator_agent_service()
 
@@ -66,13 +80,15 @@ async def create_session(
 
         logger.info(f"Calling service.create_session...")
         response = await service.create_session(
-            user_id=1,  # Test user ID
+            user_id=current_user.id if current_user else 1,  # 使用实际用户ID或测试ID
             api_key=api_key,
         )
 
-        logger.info(f"Created agent session {response['session_id']} for test user")
+        logger.info(f"Created agent session {response['session_id']}")
         return response
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"===== CREATE SESSION ERROR =====")
         logger.error(f"Error: {e}", exc_info=True)
@@ -85,8 +101,7 @@ async def create_session(
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
-    # Temporarily bypass authentication for testing
-    current_user: User = Depends(get_bypass_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ) -> Any:
     """
     与 Skill Creator Agent 对话
@@ -97,12 +112,19 @@ async def chat(
         Agent 响应（下一个问题或总结）
     """
     try:
+        # 生产环境：未登录用户提示需要登录
+        if not ALLOW_ANONYMOUS_SKILL_CREATION and not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="请先登录后再对话",
+            )
+
         service = get_skill_creator_agent_service()
 
         response = await service.chat(
             session_id=request.session_id,
             message=request.message,
-            user_id=1,  # Test user ID
+            user_id=current_user.id if current_user else 1,
         )
 
         logger.info(f"Chat in session {request.session_id}, q={response.get('question_number') or 'summary'}")
@@ -129,7 +151,7 @@ async def chat(
 @router.post("/session/end")
 async def end_session(
     session_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ) -> Any:
     """
     结束 Agent 会话
@@ -140,14 +162,21 @@ async def end_session(
         最终的技能元数据
     """
     try:
+        # 生产环境：未登录用户提示需要登录
+        if not ALLOW_ANONYMOUS_SKILL_CREATION and not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="请先登录后再结束会话",
+            )
+
         service = get_skill_creator_agent_service()
 
         response = await service.end_session(
             session_id=session_id,
-            user_id=1,  # Test user ID
+            user_id=current_user.id if current_user else 1,
         )
 
-        logger.info(f"Ended session {session_id} for test user")
+        logger.info(f"Ended session {session_id}")
         return response
 
     except ValueError as e:
@@ -171,7 +200,7 @@ async def end_session(
 @router.get("/session/{session_id}")
 async def get_session_status(
     session_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ) -> Any:
     """
     获取会话状态
@@ -180,6 +209,13 @@ async def get_session_status(
         会话状态信息
     """
     try:
+        # 生产环境：未登录用户提示需要登录
+        if not ALLOW_ANONYMOUS_SKILL_CREATION and not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="请先登录后再查看会话",
+            )
+
         service = get_skill_creator_agent_service()
         session = service.sessions.get(session_id)
 
@@ -189,7 +225,9 @@ async def get_session_status(
                 detail=f"Session {session_id} not found",
             )
 
-        if session.user_id != 1:  # Test user ID
+        # 权限检查：只允许会话创建者查看状态
+        user_id = current_user.id if current_user else 1
+        if session.user_id != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized for this session",
@@ -218,17 +256,32 @@ async def get_session_status(
 async def save_skill_from_session(
     session_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ) -> Any:
     """
     从会话保存技能到数据库
 
     基于会话收集的元数据创建技能记录
 
+    环境变量控制：
+    - ALLOW_ANONYMOUS_SKILL_CREATION=true: 允许匿名保存（开发环境）
+    - ALLOW_ANONYMOUS_SKILL_CREATION=false: 需要登录（生产环境，默认）
+
     Returns:
         创建的技能信息
     """
     try:
+        # 生产环境：未登录用户无法保存技能
+        if not ALLOW_ANONYMOUS_SKILL_CREATION and not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": "请先登录后再保存技能",
+                    "code": "LOGIN_REQUIRED",
+                    "redirect_to": "/login"
+                }
+            )
+
         service = get_skill_creator_agent_service()
         session = service.sessions.get(session_id)
 
@@ -238,14 +291,18 @@ async def save_skill_from_session(
                 detail=f"Session {session_id} not found",
             )
 
-        if session.user_id != 1:  # Test user ID
+        # 权限检查：只允许会话创建者保存技能
+        user_id = current_user.id if current_user else 1
+        if session.user_id != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized for this session",
             )
 
         # 生成元数据
+        logger.info(f"Generating metadata from session answers: {session.answers}")
         metadata = service._generate_metadata(session.answers)
+        logger.info(f"Generated metadata: {metadata}")
 
         # 构建 SKILL.md 内容
         skill_md_content = f"""---
@@ -268,7 +325,7 @@ category: {metadata['category']}
 | 类型 | 调用方式 | 示例 | 说明 |
 |------|----------|------|------|
 | **主别名** | 自然语言 | `{metadata['main_alias']} ...` | 最常用 |
-{chr(10).join(f"| 上下文别名 | 自然语言 | `{alias}` | 专用场景 |" for alias in metadata['context_aliases'])}
+{chr(10).join(f"| 上下文别名 | 自然语言 | `{alias}` | 专用场景 |" for alias in metadata.get('context_aliases', []) if alias != metadata['main_alias'])}
 | **命令别名** | 快捷命令 | `/{metadata['command_alias']} ...` | 高级用法 |
 | **API别名** | 程序调用 | `{metadata['api_alias']}` | 系统集成 |
 
@@ -290,7 +347,7 @@ category: {metadata['category']}
 
 ## 🔧 建议能力
 
-{chr(10).join(f"- **{cap['name']}** (复杂度: {cap['complexity']})" for cap in metadata['suggested_capabilities'])}
+{chr(10).join(f"- **{cap.get('name', '未知能力')}** (复杂度: {cap.get('complexity', 'medium')})" for cap in metadata.get('suggested_capabilities', []))}
 """
 
         # 创建技能记录
@@ -311,7 +368,7 @@ category: {metadata['category']}
             },
             is_active=True,
             version="1.0.0",
-            created_by=1,  # Test user ID
+            created_by=user_id,  # 使用实际用户ID
             sharing_scope="private",
             is_official=False,
         )

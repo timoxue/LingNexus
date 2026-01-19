@@ -48,6 +48,41 @@
           </div>
         </div>
 
+        <!-- 4阶段进度条 -->
+        <div v-if="currentQuestion > 0 || isSummary" class="progress-panel">
+          <div class="progress-header">
+            <el-icon><TrendCharts /></el-icon>
+            <span>创建进度</span>
+            <span class="progress-text">{{ currentQuestion }}/4 阶段</span>
+          </div>
+          <div class="progress-steps">
+            <div
+              v-for="step in 4"
+              :key="step"
+              class="progress-step"
+              :class="{
+                'completed': step < currentQuestion,
+                'active': step === currentQuestion && !isSummary,
+                'pending': step > currentQuestion
+              }"
+            >
+              <div class="step-circle">
+                <el-icon v-if="step < currentQuestion"><CircleCheck /></el-icon>
+                <span v-else>{{ step }}</span>
+              </div>
+              <div class="step-label">
+                <span class="step-name">{{ getStepName(step) }}</span>
+                <span v-if="step < currentQuestion" class="step-score">{{ getStepScore(step) }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" :style="{ width: `${progressPercentage}%` }"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- AI 对话区 -->
         <div class="chat-panel">
           <div class="chat-messages" ref="messagesRef">
@@ -87,10 +122,20 @@
                         </span>
                       </div>
 
+                      <!-- 上一阶段完成提示（用于 next_dimension） -->
+                      <div v-if="msg.previousScore !== undefined" class="previous-stage-completion">
+                        <el-icon><CircleCheck /></el-icon>
+                        <span>
+                          阶段 {{ msg.previousDimension }} 完成！评分
+                          <strong :class="getScoreClass(msg.previousScore)">{{ msg.previousScore }}/100</strong>
+                          {{ msg.previousScore >= 91 ? '✅ 优秀' : '⚠️ 需改进' }}
+                        </span>
+                      </div>
+
                       <h3>{{ msg.questionText }}</h3>
 
-                      <!-- 评分详情 -->
-                      <div v-if="msg.score !== undefined" class="score-detail">
+                      <!-- 评分详情（仅用于 follow_up） -->
+                      <div v-if="msg.score !== undefined && msg.responseType === 'follow_up'" class="score-detail">
                         <div class="score-bar-container">
                           <div class="score-bar-track">
                             <div class="score-bar-fill" :style="{ width: `${msg.score}%` }" :class="getScoreClass(msg.score)"></div>
@@ -386,6 +431,8 @@ interface Message {
   score?: number
   reasoning?: string
   recommendedOptions?: Array<{ id: string; text: string }>
+  previousScore?: number  // 上一阶段的评分（用于 next_dimension）
+  previousDimension?: number  // 上一阶段编号（用于 next_dimension）
 }
 const messages = ref<Message[]>([])
 
@@ -413,6 +460,14 @@ const metadataTokens = ref(0)
 const instructionsTokens = ref(0)
 const totalTokens = computed(() => metadataTokens.value + instructionsTokens.value)
 
+// 4阶段进度追踪
+const stageProgress = ref([
+  { name: '核心价值', score: null as number | null, completed: false },
+  { name: '使用场景', score: null as number | null, completed: false },
+  { name: '别名偏好', score: null as number | null, completed: false },
+  { name: '边界资源', score: null as number | null, completed: false },
+])
+
 // Refs
 const messagesRef = ref<HTMLElement>()
 const logRef = ref<HTMLElement>()
@@ -422,6 +477,26 @@ const progressPercentage = computed(() => {
   if (isSummary.value) return 100
   return currentQuestion.value ? currentQuestion.value * 25 : 0
 })
+
+// === 阶段进度函数 ===
+const getStepName = (step: number) => {
+  return stageProgress.value[step - 1]?.name || `阶段${step}`
+}
+
+const getStepScore = (step: number) => {
+  const score = stageProgress.value[step - 1]?.score
+  return score !== null ? `${score}分` : ''
+}
+
+const updateStageProgress = (stage: number, score: number, name?: string) => {
+  if (stage >= 1 && stage <= 4) {
+    stageProgress.value[stage - 1].score = score
+    stageProgress.value[stage - 1].completed = score >= 91
+    if (name) {
+      stageProgress.value[stage - 1].name = name
+    }
+  }
+}
 
 // === Log 功能 ===
 const addLog = (message: string, type: LogEntry['type'] = 'info') => {
@@ -572,6 +647,12 @@ const sendAnswer = async () => {
 
       // 记录阶段变更并更新 SKILL.md
       if (response.type === 'next_dimension') {
+        // 更新上一阶段的评分
+        if (response.score !== undefined && response.progress?.current) {
+          const previousStage = response.progress.current - 1
+          updateStageProgress(previousStage, response.score)
+        }
+
         addLog(`进入阶段 ${response.progress?.current}/4: ${response.dimension_name}`, 'success')
         // 进入新维度时，更新上一维度的内容到 SKILL.md
         if (previousDimension && answer) {
@@ -645,9 +726,11 @@ const addQuestionMessage = (response: any) => {
     progress: response.progress,
     responseType: response.type,
     dimensionName: response.dimension_name,
-    score: response.score,
+    score: response.type === 'next_dimension' ? undefined : response.score, // next_dimension 不显示 score（那是上一阶段的）
     reasoning: response.reasoning,
     recommendedOptions: response.recommended_options || [],
+    previousScore: response.type === 'next_dimension' ? response.score : undefined, // 上一阶段的评分
+    previousDimension: response.type === 'next_dimension' ? (response.progress?.current - 1) : undefined, // 上一阶段编号
   })
 
   currentDimension.value = response.current_dimension
@@ -862,8 +945,14 @@ const confirmMetadata = async () => {
   try {
     const response = await skillCreatorApi.saveSkillFromSession(sessionId.value)
     addLog(`技能保存成功: ${response.skill_name}`, 'success')
-    ElMessage.success(`技能 "${response.skill_name}" 保存成功！`)
-    router.push('/skills')
+    ElMessage.success({
+      message: `技能 "${response.skill_name}" 保存成功！`,
+      duration: 3000,
+      onClose: () => {
+        // 跳转到 Marketplace（无需登录）
+        router.push('/marketplace')
+      }
+    })
   } catch (error) {
     console.error('Failed to save skill:', error)
     addLog('保存失败', 'error')
@@ -1007,6 +1096,144 @@ const restartSession = () => {
   0%, 20% { content: '.'; }
   40% { content: '..'; }
   60%, 100% { content: '...'; }
+}
+
+/* ===== 4阶段进度条 ===== */
+.progress-panel {
+  background: white;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 12px 16px;
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1d1d1f;
+}
+
+.progress-text {
+  margin-left: auto;
+  color: #86868b;
+  font-size: 12px;
+}
+
+.progress-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.progress-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+}
+
+.step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  background: #f5f5f7;
+  color: #86868b;
+  transition: all 0.3s ease;
+}
+
+.progress-step.completed .step-circle {
+  background: #34c759;
+  color: white;
+}
+
+.progress-step.active .step-circle {
+  background: #007aff;
+  color: white;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+.step-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.step-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: #1d1d1f;
+}
+
+.progress-step.completed .step-name {
+  color: #34c759;
+}
+
+.progress-step.active .step-name {
+  color: #007aff;
+}
+
+.progress-step.pending .step-name {
+  color: #86868b;
+}
+
+.step-score {
+  font-size: 10px;
+  font-weight: 600;
+  color: #34c759;
+}
+
+.progress-bar-container {
+  height: 4px;
+  background: #f5f5f7;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-track {
+  height: 100%;
+  background: #e5e5ea;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #007aff, #34c759);
+  transition: width 0.5s ease;
+  border-radius: 2px;
+}
+
+/* ===== 上一阶段完成提示 ===== */
+.previous-stage-completion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, rgba(52, 199, 89, 0.1), rgba(52, 199, 89, 0.05));
+  border: 1px solid rgba(52, 199, 89, 0.2);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1d1d1f;
+}
+
+.previous-stage-completion .el-icon {
+  color: #34c759;
+  font-size: 16px;
+}
+
+.previous-stage-completion strong {
+  margin: 0 4px;
 }
 
 /* ===== 对话面板 ===== */

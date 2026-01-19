@@ -104,7 +104,7 @@ class AgentSession:
             self.agent = create_skill_creator_agent(
                 model_name="qwen-max",
                 api_key=api_key,
-                temperature=0.4,
+                temperature=0.1,  # 降低温度以提高评分稳定性
                 project_name=unique_project_name,
             )
 

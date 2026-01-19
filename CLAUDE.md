@@ -962,6 +962,33 @@ For more information, see:
 
 ## Version History
 
+### v1.0.3 (2025-01-20)
+
+**Bug Fixes**:
+- 🐛 修复 AttributeError: 'function' object has no attribute 'username'
+  - 移除了返回函数对象而非 User 对象的辅助函数
+  - 统一所有端点使用 `get_current_user_optional` from `core/deps.py`
+- 🔧 为所有 Skill Creator 端点添加环境变量检查
+  - `create_session` - 添加 ALLOW_ANONYMOUS_SKILL_CREATION 检查
+  - `chat` - 添加环境变量检查
+  - `end_session` - 添加环境变量检查
+  - `get_session_status` - 添加环境变量检查
+  - `save_skill` - 已有环境变量检查
+- 🛡️ 改进 SKILL.md 生成时的空值处理
+  - `context_aliases` - 使用 `.get()` 和列表推导式过滤主别名
+  - `suggested_capabilities` - 使用 `.get()` 防止 KeyError
+  - 添加详细的调试日志
+
+**Documentation**:
+- 📝 更新 `docs/platform/SKILL_CREATOR_AUTH_CONFIG.md`
+  - 添加 v1.0.3 更新日志
+  - 记录最新的 bug 修复和架构改进
+
+**Technical Improvements**:
+- 统一 user_id 处理模式：`current_user.id if current_user else 1`
+- 所有端点返回一致的 HTTP 状态码和错误消息
+- 添加详细的日志记录用于问题诊断
+
 ### v1.0.2 (2025-01-19)
 
 **Platform Features**:
