@@ -97,7 +97,7 @@ export async function createAgentSession(useApiKey = false): Promise<CreateSessi
     '/skill-creator-agent/session/create',
     { use_api_key: useApiKey }
   )
-  return response
+  return response.data
 }
 
 /**
@@ -108,7 +108,7 @@ export async function agentChat(sessionId: string, message: string): Promise<Cha
     session_id: sessionId,
     message,
   })
-  return response
+  return response.data
 }
 
 /**
@@ -119,7 +119,7 @@ export async function endAgentSession(sessionId: string): Promise<ChatResponse> 
     `/skill-creator-agent/session/end?session_id=${sessionId}`,
     {}
   )
-  return response
+  return response.data
 }
 
 /**
@@ -127,7 +127,7 @@ export async function endAgentSession(sessionId: string): Promise<ChatResponse> 
  */
 export async function getSessionStatus(sessionId: string): Promise<SessionStatus> {
   const response = await client.get<SessionStatus>(`/skill-creator-agent/session/${sessionId}`)
-  return response
+  return response.data
 }
 
 /**
@@ -138,7 +138,7 @@ export async function saveSkillFromSession(sessionId: string): Promise<SaveSkill
     `/skill-creator-agent/session/${sessionId}/save-skill`,
     {}
   )
-  return response
+  return response.data
 }
 
 // ========== 导出 API 对象 ==========

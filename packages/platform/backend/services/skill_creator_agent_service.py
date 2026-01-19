@@ -96,11 +96,16 @@ class AgentSession:
             logger.info(f"  temperature: 0.4")
             logger.info(f"  project_name: LingNexus-SkillCreator")
 
+            # 使用唯一的 project_name 以确保每个 session 有独立的 memory
+            # AgentScope 的 memory 是按照 project 绑定的
+            unique_project_name = f"LingNexus-SkillCreator-{self.session_id}"
+            logger.info(f"Using unique project name for session-scoped memory: {unique_project_name}")
+
             self.agent = create_skill_creator_agent(
                 model_name="qwen-max",
                 api_key=api_key,
                 temperature=0.4,
-                project_name="LingNexus-SkillCreator",
+                project_name=unique_project_name,
             )
 
             logger.info(f"Agent '{self.agent.name}' created successfully")
@@ -319,12 +324,21 @@ class SkillCreatorAgentService:
             logger.error(f"Error type: {type(e).__name__}")
             logger.error(f"Error message: {e}")
             logger.error(f"Traceback:", exc_info=True)
+
+            # 获取当前维度的中文名称
+            dimension_names = {
+                "core_value": "核心价值",
+                "usage_scenario": "使用场景",
+                "alias_preference": "别名偏好",
+                "boundaries": "边界限制"
+            }
+
             # 发生错误时，返回一个特殊的错误响应而不是默认通过
             return {
                 "type": "error",
                 "error": str(e),
                 "current_dimension": session.current_dimension,
-                "dimension_name": session.current_dimension,
+                "dimension_name": dimension_names.get(session.current_dimension, session.current_dimension),
                 "follow_up_question": f"抱歉，处理您的回答时出现了错误。请重新描述或简化您的回答。\n\n错误信息: {str(e)[:100]}",
                 "score": 0,  # 使用 0 分表示错误
                 "reasoning": "Agent 调用失败",
@@ -382,7 +396,25 @@ class SkillCreatorAgentService:
         context_parts.append("1. 对用户最新回答进行评分（0-100分）")
         context_parts.append("2. 综合该维度的所有回答，判断信息是否充足")
         context_parts.append("3. 如果评分 >= 91，返回 next_dimension 进入下一维度")
-        context_parts.append("4. 如果评分 < 91，返回 follow_up，并生成 3-5 个推荐选项帮助用户补充信息")
+        context_parts.append("4. 如果评分 < 91，返回 follow_up，并提供具体帮助")
+        context_parts.append("")
+        context_parts.append("【关于 recommended_options 的重要说明】：")
+        context_parts.append("⚠️ recommended_options 必须是【具体的模拟回答】，而不是指导性提示！")
+        context_parts.append("")
+        context_parts.append("❌ 错误示例（指导性提示）：")
+        context_parts.append('  {"id": "opt1", "text": "详细描述技能要解决的问题"}')
+        context_parts.append('  {"id": "opt2", "text": "指出技能的目标用户群体"}')
+        context_parts.append("")
+        context_parts.append("✅ 正确示例（具体模拟回答）：")
+        context_parts.append('  {"id": "opt1", "text": "帮助QA团队自动审查SOP文档的合规性和格式要求"}')
+        context_parts.append('  {"id": "opt2", "text": "主要用于制药企业质量管理部门，每天检查大量Word文档"}')
+        context_parts.append('  {"id": "opt3", "text": "用户上传文档后，自动提取关键信息并生成检查报告"}')
+        context_parts.append("")
+        context_parts.append("每个选项都应该：")
+        context_parts.append("- 基于用户已提供的信息进行合理推断和补充")
+        context_parts.append("- 使用完整的句子，描述具体的场景或功能")
+        context_parts.append("- 长度在20-50字之间，提供足够具体的细节")
+        context_parts.append("- 作为【答案】而不是【问题】呈现")
         context_parts.append("\n【返回格式】:")
         context_parts.append("必须严格按照以下 JSON 格式返回，不要添加任何其他文字：")
         context_parts.append("""
@@ -401,10 +433,10 @@ class SkillCreatorAgentService:
   "type": "follow_up",
   "score": 65,
   "reasoning": "评分理由",
-  "follow_up_question": "追问的问题",
+  "follow_up_question": "简要说明需要补充的信息方向",
   "recommended_options": [
-    {"id": "opt1", "text": "推荐选项1"},
-    {"id": "opt2", "text": "推荐选项2"}
+    {"id": "opt1", "text": "基于用户信息的具体模拟回答1"},
+    {"id": "opt2", "text": "基于用户信息的具体模拟回答2"}
   ]
 }
 ```
