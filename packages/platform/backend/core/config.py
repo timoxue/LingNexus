@@ -10,8 +10,10 @@ from typing import List
 
 # ==================== 基础路径配置 ====================
 
-# 项目根目录（自动检测）
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+# 项目根目录（自动检测，使用绝对路径）
+# config.py 位于 packages/platform/backend/core/config.py
+# 需要向上 5 级到达项目根目录
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 
 # 后端目录
 BACKEND_DIR = PROJECT_ROOT / "packages" / "platform" / "backend"
@@ -23,7 +25,7 @@ BACKEND_DIR = PROJECT_ROOT / "packages" / "platform" / "backend"
 ARTIFACTS_DIR = Path(os.getenv(
     "ARTIFACTS_DIR",
     str(BACKEND_DIR / "artifacts")
-))
+)).resolve()  # 确保是绝对路径
 
 # 用户上传文件目录
 USER_FILES_DIR = ARTIFACTS_DIR / "user_files"
@@ -62,7 +64,7 @@ ALLOWED_MIME_TYPES: List[str] = []  # 例如 ['application/pdf', 'image/jpeg']
 AGENT_WORK_DIR = Path(os.getenv(
     "AGENT_WORK_DIR",
     str(Path(os.getenv("TEMP", "/tmp")) / "agent_workspace")
-))
+)).resolve()  # 确保是绝对路径
 
 # 是否保留 Agent 执行工作目录（调试用）
 PRESERVE_AGENT_WORK_DIR = os.getenv("PRESERVE_AGENT_WORK_DIR", "false").lower() == "true"
