@@ -1,0 +1,197 @@
+{
+  "$schema": "https://openclaw.io/schemas/workflow/v1.json",
+  "workflow_id": "biopharma-scouting",
+  "display_name": "全球医药专利情报挖掘流水线 (BioPharm Scouting)",
+  "version": "1.0.0",
+  "created_at": "2026-03-14T00:00:00Z",
+
+  "trigger": {
+    "type": "agent_call",
+    "caller": "main",
+    "input_schema": {
+      "raw_query": { "type": "string", "required": true, "description": "飞书用户的原始查询文本" },
+      "channel": { "type": "string", "default": "feishu" },
+      "user_id": { "type": "string", "required": false }
+    }
+  },
+
+  "blackboard": {
+    "Pending_Tasks": {
+      "type": "array",
+      "item_schema": {
+        "task_id": "string",
+        "language": "string",
+        "region": "string",
+        "target_source": "string",
+        "search_query": "string",
+        "priority": "integer",
+        "status": { "enum": ["pending", "in_progress", "completed", "failed"] }
+      }
+    },
+    "Raw_Evidence": {
+      "type": "array",
+      "item_schema": {
+        "evidence_id": "string",
+        "source_task_id": "string",
+        "language": "string",
+        "region": "string",
+        "source_url": "string",
+        "source_name": "string",
+        "raw_text": "string",
+        "crawled_at": "string",
+        "status": { "enum": ["pending_validation", "validated", "rejected"] }
+      }
+    },
+    "Validated_Assets": {
+      "type": "array",
+      "item_schema": {
+        "validation_id": "string",
+        "source_evidence_id": "string",
+        "is_met": "boolean",
+        "origin_country": "string",
+        "entity_name": "string",
+        "drug_candidate": "string",
+        "target": "string",
+        "degrader_modality": { "enum": ["PROTAC", "Molecular Glue", "LYTAC", "ATTEC", "AUTAC", "Other"] },
+        "clinical_stage": { "enum": ["Pre-Clinical", "IND-Enabling", "Phase I", "Phase I/II"] },
+        "patent_id": "string",
+        "evidence_quote": "string",
+        "failure_rationale": "string|null",
+        "validated_at": "string"
+      }
+    },
+    "Rejected_Evidence": {
+      "type": "array",
+      "item_schema": {
+        "validation_id": "string",
+        "source_evidence_id": "string",
+        "is_met": { "const": false },
+        "failure_rationale": "string",
+        "evidence_quote": "string",
+        "rejected_at": "string"
+      }
+    }
+  },
+
+  "pipeline": [
+    {
+      "step_id": "S1",
+      "step": 1,
+      "name": "query_decomposition",
+      "agent": "coach",
+      "description": "将用户查询拆解为5条多语种搜索子指令",
+      "input": {
+        "source": "trigger.raw_query"
+      },
+      "output": {
+        "target": "blackboard.Pending_Tasks",
+        "schema": "array<PendingTask>"
+      },
+      "guardrails": {
+        "min_tasks": 5,
+        "max_tasks": 5,
+        "required_languages": ["en", "zh", "ja"]
+      },
+      "timeout": "30s",
+      "retry": { "max_attempts": 2, "backoff": "5s" },
+      "on_success": "S2",
+      "on_failure": "abort_with_error"
+    },
+    {
+      "step_id": "S2",
+      "step": 2,
+      "name": "parallel_multilingual_crawl",
+      "agent": "investigator",
+      "description": "并发采集5个语种/数据源的原始情报",
+      "input": {
+        "source": "blackboard.Pending_Tasks",
+        "filter": { "status": "pending" }
+      },
+      "output": {
+        "target": "blackboard.Raw_Evidence",
+        "schema": "array<RawEvidence>"
+      },
+      "parallelism": {
+        "mode": "full_concurrent",
+        "max_workers": 5
+      },
+      "guardrails": {
+        "no_llm_summarization": true,
+        "raw_text_required": true,
+        "min_evidence_per_task": 1
+      },
+      "timeout": "180s",
+      "retry": { "max_attempts": 1 },
+      "on_success": "S3",
+      "on_failure": "continue_to_S3_with_partial"
+    },
+    {
+      "step_id": "S3",
+      "step": 3,
+      "name": "patent_quality_control",
+      "agent": "validator",
+      "description": "按4条硬性规则逐条校验原始证据，物理断网",
+      "input": {
+        "source": "blackboard.Raw_Evidence",
+        "filter": { "status": "pending_validation" }
+      },
+      "output": {
+        "validated": {
+          "target": "blackboard.Validated_Assets",
+          "condition": "is_met == true"
+        },
+        "rejected": {
+          "target": "blackboard.Rejected_Evidence",
+          "condition": "is_met == false"
+        }
+      },
+      "guardrails": {
+        "network_access": false,
+        "force_json_output": true,
+        "required_fields": ["is_met", "origin_country", "evidence_quote", "failure_rationale"]
+      },
+      "timeout": "120s",
+      "retry": { "max_attempts": 2, "backoff": "10s" },
+      "on_success": "S4",
+      "on_failure": "abort_with_error"
+    },
+    {
+      "step_id": "S4",
+      "step": 4,
+      "name": "dedup_and_report_generation",
+      "agent": "deduplicator",
+      "description": "跨语种消歧去重，生成高管级 Markdown 简报",
+      "input": {
+        "source": "blackboard.Validated_Assets",
+        "filter": { "is_met": true }
+      },
+      "output": {
+        "target": "workflow.return_payload",
+        "key": "deduplicator.output",
+        "format": "markdown"
+      },
+      "guardrails": {
+        "no_raw_json_output": true,
+        "cross_lingual_dedup_required": true
+      },
+      "timeout": "60s",
+      "retry": { "max_attempts": 2, "backoff": "5s" },
+      "on_success": "workflow_complete",
+      "on_failure": "abort_with_error"
+    }
+  ],
+
+  "completion": {
+    "type": "workflow_complete",
+    "return_to": "main",
+    "payload": {
+      "output": "workflow.return_payload.deduplicator.output",
+      "metadata": {
+        "workflow_id": "biopharma-scouting",
+        "validated_count": "len(blackboard.Validated_Assets)",
+        "rejected_count": "len(blackboard.Rejected_Evidence)",
+        "total_evidence": "len(blackboard.Raw_Evidence)"
+      }
+    }
+  }
+}

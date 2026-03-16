@@ -1,0 +1,151 @@
+{
+  "$schema": "https://openclaw.io/schemas/config/v1.json",
+  "project": "LINGNEXUS",
+  "version": "1.0.0",
+  "description": "全球化医药专利多智能体情报挖掘系统",
+  "created_at": "2026-03-14T00:00:00Z",
+
+  "shared_memory": {
+    "enabled": true,
+    "backend": "local",
+    "storage_path": "./.openclaw/blackboard",
+    "namespaces": [
+      "Pending_Tasks",
+      "Raw_Evidence",
+      "Validated_Assets",
+      "Rejected_Evidence"
+    ],
+    "members": [
+      "main",
+      "coach",
+      "investigator",
+      "validator",
+      "deduplicator"
+    ],
+    "access_control": {
+      "main":          { "read": [],                                    "write": [] },
+      "coach":         { "read": [],                                    "write": ["Pending_Tasks"] },
+      "investigator":  { "read": ["Pending_Tasks"],                     "write": ["Raw_Evidence", "Pending_Tasks"] },
+      "validator":     { "read": ["Raw_Evidence"],                      "write": ["Validated_Assets", "Rejected_Evidence"] },
+      "deduplicator":  { "read": ["Validated_Assets"],                  "write": [] }
+    }
+  },
+
+  "agents": [
+    {
+      "id": "main",
+      "workspace": "./agents/main",
+      "soul": "./agents/main/SOUL.md",
+      "config": "./agents/main/AGENTS.md",
+      "role": "gateway"
+    },
+    {
+      "id": "coach",
+      "workspace": "./agents/coach",
+      "soul": "./agents/coach/SOUL.md",
+      "config": "./agents/coach/AGENTS.md",
+      "role": "strategist"
+    },
+    {
+      "id": "investigator",
+      "workspace": "./agents/investigator",
+      "soul": "./agents/investigator/SOUL.md",
+      "config": "./agents/investigator/AGENTS.md",
+      "role": "crawler"
+    },
+    {
+      "id": "validator",
+      "workspace": "./agents/validator",
+      "soul": "./agents/validator/SOUL.md",
+      "config": "./agents/validator/AGENTS.md",
+      "role": "quality_control"
+    },
+    {
+      "id": "deduplicator",
+      "workspace": "./agents/deduplicator",
+      "soul": "./agents/deduplicator/SOUL.md",
+      "config": "./agents/deduplicator/AGENTS.md",
+      "role": "output_formatter"
+    }
+  ],
+
+  "bindings": [
+    {
+      "id": "feishu-patent-scout",
+      "channel": "feishu",
+      "description": "将飞书中的医药专利情报请求路由给 main 接待员",
+      "match": {
+        "mode": "any_of",
+        "keywords": ["专利", "挖掘", "靶向药", "全球"]
+      },
+      "route_to": "main",
+      "priority": 1
+    }
+  ],
+
+  "workflows": [
+    {
+      "id": "biopharma-scouting",
+      "name": "全球医药专利情报挖掘流水线",
+      "description": "从查询拆解到专利验证的端到端多智能体协作工作流",
+      "version": "1.0.0",
+      "timeout": "600s",
+      "steps": [
+        {
+          "step": 1,
+          "agent": "coach",
+          "name": "query_decomposition",
+          "description": "将用户原始查询拆解为5条多语种搜索子任务",
+          "input": "workflow.payload.raw_query",
+          "output_to_blackboard": "Pending_Tasks",
+          "on_failure": "abort"
+        },
+        {
+          "step": 2,
+          "agent": "investigator",
+          "name": "parallel_crawl",
+          "description": "并发执行5个语种/数据源的搜索采集",
+          "input_from_blackboard": "Pending_Tasks",
+          "output_to_blackboard": "Raw_Evidence",
+          "parallelism": "full",
+          "on_failure": "continue_partial"
+        },
+        {
+          "step": 3,
+          "agent": "validator",
+          "name": "patent_validation",
+          "description": "按硬性拦截规则逐条校验原始证据",
+          "input_from_blackboard": "Raw_Evidence",
+          "output_to_blackboard": ["Validated_Assets", "Rejected_Evidence"],
+          "network_access": false,
+          "on_failure": "abort"
+        },
+        {
+          "step": 4,
+          "agent": "deduplicator",
+          "name": "dedup_and_report",
+          "description": "跨语种去重并生成高管级 Markdown 简报",
+          "input_from_blackboard": "Validated_Assets",
+          "output_to_workflow": "deduplicator.output",
+          "on_failure": "abort"
+        }
+      ],
+      "on_complete": {
+        "return_to": "main",
+        "payload_key": "deduplicator.output"
+      }
+    }
+  ],
+
+  "logging": {
+    "level": "info",
+    "output": "./.openclaw/logs/lingnexus.log",
+    "include_blackboard_snapshots": true
+  },
+
+  "runtime": {
+    "mode": "local",
+    "max_concurrent_workflows": 3,
+    "blackboard_ttl": "24h"
+  }
+}

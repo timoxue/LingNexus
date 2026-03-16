@@ -1,0 +1,73 @@
+name: lingnexus
+
+services:
+  gateway:
+    image: openclaw:local
+    container_name: lingnexus-gateway
+    restart: unless-stopped
+    ports:
+      - "18789:18789"
+    volumes:
+      - type: bind
+        source: .
+        target: /workspace
+        read_only: true
+      - openclaw-state:/home/node/.openclaw
+    environment:
+      # ── Anthropic: Claude Code 订阅凭证 ──────────────────
+      ANTHROPIC_OAUTH_TOKEN: ${ANTHROPIC_OAUTH_TOKEN}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_OAUTH_TOKEN}
+      ANTHROPIC_BASE_URL: http://host.docker.internal:18790
+      # ── 第三方模型 ─────────────────────────────────────────
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # ── 运行时配置 ─────────────────────────────────────────
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_LOG_LEVEL: ${OPENCLAW_LOG_LEVEL:-info}
+      NODE_ENV: production
+    command: >
+      node openclaw.mjs gateway
+        --allow-unconfigured
+        --port 18789
+        --bind loopback
+        --auth ${OPENCLAW_AUTH_MODE:-none}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:18789/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+  setup:
+    image: openclaw:local
+    container_name: lingnexus-setup
+    profiles: ["setup"]
+    volumes:
+      - type: bind
+        source: .
+        target: /workspace
+        read_only: true
+      - openclaw-state:/home/node/.openclaw
+    environment:
+      # ── Anthropic: Claude Code 订阅凭证 ──────────────────
+      ANTHROPIC_OAUTH_TOKEN: ${ANTHROPIC_OAUTH_TOKEN}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_OAUTH_TOKEN}
+      ANTHROPIC_BASE_URL: http://host.docker.internal:18790
+      # ── 第三方模型 ─────────────────────────────────────────
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # ── Agent 模型分配 ─────────────────────────────────────
+      OPENCLAW_LOG_LEVEL: ${OPENCLAW_LOG_LEVEL:-info}
+      MODEL_MAIN: ${MODEL_MAIN:-claude-haiku-4-5-20251001}
+      MODEL_COACH: ${MODEL_COACH:-kimi-coding/kimi-k2-thinking}
+      MODEL_INVESTIGATOR: ${MODEL_INVESTIGATOR:-google/gemini-2.5-flash}
+      MODEL_VALIDATOR: ${MODEL_VALIDATOR:-claude-sonnet-4-6}
+      MODEL_DEDUPLICATOR: ${MODEL_DEDUPLICATOR:-openrouter/qwen/qwen3.5-27b}
+    entrypoint: /bin/bash
+    command: /workspace/scripts/register-agents.sh
+
+volumes:
+  openclaw-state:
+    name: lingnexus-openclaw-state

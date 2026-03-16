@@ -1,0 +1,51 @@
+# Environment variables - DO NOT COMMIT
+.env
+.env.local
+.env.*.local
+
+# API Keys and secrets
+*.key
+*.pem
+*_key
+*_secret
+credentials.json
+secrets.json
+
+# OpenClaw state and logs
+.openclaw/
+*.log
+proxy.log
+
+# Test outputs
+test-e2e/
+test-workflow/
+*-output.txt
+*.output
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node modules (if any)
+node_modules/
+
+# Python (if any)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+
+# Docker volumes
+volumes/
