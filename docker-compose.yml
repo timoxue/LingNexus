@@ -39,10 +39,10 @@ services:
       retries: 3
 
   setup:
-    image: openclaw:local
+    image: lingnexus:latest
     container_name: lingnexus-setup
     profiles: ["setup"]
-    # Use default node user (UID 1000) - no need to override
+    user: root  # 需要 root 权限安装依赖
     volumes:
       - type: bind
         source: .
