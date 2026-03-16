@@ -209,11 +209,27 @@ LingNexus/
 3. 在 `openclaw.config.json` 中注册智能体
 4. 更新工作流定义（如需要）
 
+## 🔧 故障排除
+
+### Docker 权限问题（Windows）
+
+如果遇到 "read-only file system" 错误：
+
+```bash
+# 已修复：docker-compose.yml 已配置为可写模式
+# 如果仍有问题，确保容器以 root 用户运行
+docker compose down
+docker compose up gateway -d
+```
+
+详见 [DOCKER_PERMISSION_FIX.md](DOCKER_PERMISSION_FIX.md)
+
 ## 🔒 安全说明
 
 - ⚠️ **不要提交 `.env` 文件**：包含真实的 API Keys
 - ⚠️ **使用 `.env.example` 作为模板**：仅包含占位符
 - ⚠️ **检查 `.gitignore`**：确保敏感文件被排除
+- ⚠️ **root 用户**：仅在开发环境使用，生产环境需配置专用用户
 
 ## 🤝 贡献
 
