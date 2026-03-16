@@ -5,13 +5,14 @@ services:
     image: openclaw:local
     container_name: lingnexus-gateway
     restart: unless-stopped
+    user: root  # Run as root to avoid permission issues on Windows
     ports:
       - "18789:18789"
     volumes:
       - type: bind
         source: .
         target: /workspace
-        read_only: true
+        read_only: false  # Allow write access for blackboard data
       - openclaw-state:/home/node/.openclaw
     environment:
       # ── Anthropic: Claude Code 订阅凭证 ──────────────────
@@ -43,11 +44,12 @@ services:
     image: openclaw:local
     container_name: lingnexus-setup
     profiles: ["setup"]
+    user: root  # Run as root to avoid permission issues on Windows
     volumes:
       - type: bind
         source: .
         target: /workspace
-        read_only: true
+        read_only: false  # Allow write access for agent registration
       - openclaw-state:/home/node/.openclaw
     environment:
       # ── Anthropic: Claude Code 订阅凭证 ──────────────────
