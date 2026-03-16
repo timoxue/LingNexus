@@ -23,7 +23,7 @@ fi
 echo "✅ Python 版本: $(python3 --version)"
 echo "✅ pip 版本: $(pip3 --version)"
 
-# 安装依赖
+# 安装依赖（root 用户可以使用 --break-system-packages）
 echo ""
 echo "正在安装依赖..."
 pip3 install --no-cache-dir --break-system-packages beautifulsoup4 biopython

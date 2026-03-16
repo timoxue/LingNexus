@@ -7,6 +7,7 @@ L1 引擎层：浏览器引擎（基于 OpenClaw Browser）
 import subprocess
 import sys
 import json
+import os
 from pathlib import Path
 
 # 导入 L2 清洗器
@@ -16,7 +17,7 @@ from scrapers.data_cleaner import clean_html_to_text
 
 def fetch_webpage_content(url: str, timeout: int = 15) -> str:
     """
-    抓取网页内容并清洗为纯文本
+    抓取网页内容并清洗为纯文本（使用 OpenClaw Browser）
 
     Args:
         url: 目标网页 URL
@@ -26,13 +27,18 @@ def fetch_webpage_content(url: str, timeout: int = 15) -> str:
         清洗后的纯文本或错误信息
     """
     try:
+        # 设置环境变量
+        env = os.environ.copy()
+        env['DISPLAY'] = ':99'
+
         # 步骤 1: 打开网页
         open_result = subprocess.run(
-            ['node', '/app/openclaw.mjs', 'browser', 'open', url],
+            ['runuser', '-u', 'node', '--', 'node', '/app/openclaw.mjs', 'browser', 'open', url],
             capture_output=True,
             text=True,
             timeout=timeout,
-            check=False
+            check=False,
+            env=env
         )
 
         if open_result.returncode != 0:
@@ -42,12 +48,13 @@ def fetch_webpage_content(url: str, timeout: int = 15) -> str:
         # 步骤 2: 获取页面 HTML
         # 使用 evaluate 命令执行 JavaScript 获取完整 HTML
         eval_result = subprocess.run(
-            ['node', '/app/openclaw.mjs', 'browser', 'evaluate',
+            ['runuser', '-u', 'node', '--', 'node', '/app/openclaw.mjs', 'browser', 'evaluate',
              '--fn', 'document.documentElement.outerHTML'],
             capture_output=True,
             text=True,
             timeout=timeout,
-            check=False
+            check=False,
+            env=env
         )
 
         if eval_result.returncode != 0:

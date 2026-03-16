@@ -2,10 +2,10 @@ name: lingnexus
 
 services:
   gateway:
-    image: openclaw:local
+    image: lingnexus:latest
     container_name: lingnexus-gateway
     restart: unless-stopped
-    user: root  # Run as root to avoid permission issues on Windows
+    user: root  # 需要 root 权限安装依赖并切换到 node 用户
     ports:
       - "18789:18789"
     volumes:
@@ -29,15 +29,8 @@ services:
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_LOG_LEVEL: ${OPENCLAW_LOG_LEVEL:-info}
       NODE_ENV: production
-    entrypoint: /bin/bash
-    command: >
-      -c "
-      echo '🔧 初始化 Python 环境...' &&
-      bash /workspace/scripts/install-python-deps.sh &&
-      echo '🚀 启动 OpenClaw Gateway...' &&
-      cd /app &&
-      node openclaw.mjs gateway --allow-unconfigured --port 18789 --bind loopback --auth ${OPENCLAW_AUTH_MODE:-none}
-      "
+    # 使用自定义启动脚本（已包含 Xvfb 和 OpenClaw Gateway）
+    command: ["/usr/local/bin/start-lingnexus.sh"]
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:18789/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 30s
@@ -49,7 +42,7 @@ services:
     image: openclaw:local
     container_name: lingnexus-setup
     profiles: ["setup"]
-    user: root  # Run as root to avoid permission issues on Windows
+    # Use default node user (UID 1000) - no need to override
     volumes:
       - type: bind
         source: .

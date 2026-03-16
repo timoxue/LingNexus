@@ -1,0 +1,75 @@
+# LingNexus 运行时镜像
+# 基于 OpenClaw 2026.3.13，运行时按需安装依赖
+
+FROM openclaw:local
+
+# 切换到 root 用户
+USER root
+
+# 创建智能启动脚本（首次运行时安装所有依赖）
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+# 标记文件，避免重复安装\n\
+INSTALL_MARKER="/tmp/.lingnexus-deps-installed"\n\
+\n\
+if [ ! -f "$INSTALL_MARKER" ]; then\n\
+    echo "📦 首次启动：安装依赖（Python + 浏览器）..."\n\
+    export DEBIAN_FRONTEND=noninteractive\n\
+    \n\
+    # 移除可能有问题的安全源\n\
+    rm -f /etc/apt/sources.list.d/debian-security.list 2>/dev/null || true\n\
+    \n\
+    # 更新包列表\n\
+    apt-get update -qq || true\n\
+    \n\
+    # 安装 Python 依赖\n\
+    echo "  → 安装 Python 工具..."\n\
+    apt-get install -y --no-install-recommends python3-pip > /dev/null 2>&1 || true\n\
+    pip3 install --no-cache-dir --break-system-packages beautifulsoup4 biopython > /dev/null 2>&1 || true\n\
+    \n\
+    # 安装浏览器依赖\n\
+    echo "  → 安装浏览器依赖..."\n\
+    apt-get install -y --no-install-recommends --fix-missing \\\n\
+        xvfb libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \\\n\
+        libcups2 libdrm2 libxkbcommon0 libxcomposite1 \\\n\
+        libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 \\\n\
+        > /dev/null 2>&1 || true\n\
+    \n\
+    # 尝试安装 Chromium（可选）\n\
+    echo "  → 安装 Chromium..."\n\
+    apt-get install -y --no-install-recommends --fix-missing chromium > /dev/null 2>&1 || \\\n\
+        echo "    ⚠️  Chromium 安装失败（网络问题），将使用 OpenClaw 内置浏览器"\n\
+    \n\
+    rm -rf /var/lib/apt/lists/*\n\
+    touch "$INSTALL_MARKER"\n\
+    echo "✅ 依赖安装完成"\n\
+else\n\
+    echo "✅ 依赖已安装，快速启动"\n\
+fi\n\
+\n\
+# 启动虚拟显示服务器\n\
+if command -v Xvfb &> /dev/null; then\n\
+    Xvfb :99 -screen 0 1280x1024x24 &> /dev/null &\n\
+    sleep 2\n\
+    export DISPLAY=:99\n\
+fi\n\
+\n\
+# 切换到 node 用户并启动 OpenClaw Gateway\n\
+echo "🚀 启动 OpenClaw Gateway..."\n\
+exec runuser -u node -- bash -c "cd /app && node openclaw.mjs gateway --allow-unconfigured --port 18789 --bind loopback --auth ${OPENCLAW_AUTH_MODE:-none}"\n\
+' > /usr/local/bin/start-lingnexus.sh && \
+    chmod +x /usr/local/bin/start-lingnexus.sh
+
+# 切换回 node 用户
+USER node
+
+# 设置工作目录
+WORKDIR /app
+
+# 健康检查（增加启动时间以适应首次安装）
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:18789/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+# 默认启动命令
+CMD ["/usr/local/bin/start-lingnexus.sh"]

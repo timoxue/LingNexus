@@ -147,5 +147,9 @@
     "mode": "local",
     "max_concurrent_workflows": 3,
     "blackboard_ttl": "24h"
+  },
+
+  "browser": {
+    "noSandbox": true
   }
 }
