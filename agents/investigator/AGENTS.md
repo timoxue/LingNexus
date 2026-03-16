@@ -16,6 +16,13 @@ crawler
 - language_parallelism
 
 ## tools
+- global_intelligence_search:
+    type: custom_skill
+    path: skills/global_search_skill.py
+    max_concurrent: 5
+    supported_languages: [zh, en, ja, ko, de]
+    timeout_per_task: 60s
+    allowed_domains: [pubmed, general_web]
 - web_search:
     max_concurrent: 5
     supported_languages: [zh, en, ja, ko, de]

@@ -23,21 +23,26 @@ services:
       MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # ── 医疗数据库 API ─────────────────────────────────────
+      NCBI_EMAIL: ${NCBI_EMAIL:-}
       # ── 运行时配置 ─────────────────────────────────────────
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_LOG_LEVEL: ${OPENCLAW_LOG_LEVEL:-info}
       NODE_ENV: production
+    entrypoint: /bin/bash
     command: >
-      node openclaw.mjs gateway
-        --allow-unconfigured
-        --port 18789
-        --bind loopback
-        --auth ${OPENCLAW_AUTH_MODE:-none}
+      -c "
+      echo '🔧 初始化 Python 环境...' &&
+      bash /workspace/scripts/install-python-deps.sh &&
+      echo '🚀 启动 OpenClaw Gateway...' &&
+      cd /app &&
+      node openclaw.mjs gateway --allow-unconfigured --port 18789 --bind loopback --auth ${OPENCLAW_AUTH_MODE:-none}
+      "
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:18789/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 10s
-      start_period: 20s
+      start_period: 60s  # 增加启动时间，因为需要安装 Python 依赖
       retries: 3
 
   setup:
@@ -60,6 +65,8 @@ services:
       MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # ── 医疗数据库 API ─────────────────────────────────────
+      NCBI_EMAIL: ${NCBI_EMAIL:-}
       # ── Agent 模型分配 ─────────────────────────────────────
       OPENCLAW_LOG_LEVEL: ${OPENCLAW_LOG_LEVEL:-info}
       MODEL_MAIN: ${MODEL_MAIN:-claude-haiku-4-5-20251001}
@@ -68,7 +75,13 @@ services:
       MODEL_VALIDATOR: ${MODEL_VALIDATOR:-claude-sonnet-4-6}
       MODEL_DEDUPLICATOR: ${MODEL_DEDUPLICATOR:-openrouter/qwen/qwen3.5-27b}
     entrypoint: /bin/bash
-    command: /workspace/scripts/register-agents.sh
+    command: >
+      -c "
+      echo '🔧 初始化 Python 环境...' &&
+      bash /workspace/scripts/install-python-deps.sh &&
+      echo '📝 注册 Agents...' &&
+      bash /workspace/scripts/register-agents.sh
+      "
 
 volumes:
   openclaw-state:
