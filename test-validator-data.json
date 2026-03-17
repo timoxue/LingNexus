@@ -1,0 +1,116 @@
+{
+  "test_cases": [
+    {
+      "case_id": "PASS_001",
+      "description": "完美通过所有规则 - PROTAC BRD4 临床前",
+      "expected": "is_met: true",
+      "evidence": {
+        "evidence_id": "E20260317_001",
+        "source_task_id": "T1_EN_GLOBAL",
+        "language": "en",
+        "region": "US",
+        "source_url": "https://pubmed.ncbi.nlm.nih.gov/example1",
+        "source_name": "PubMed",
+        "raw_text": "Arvinas Inc. (New Haven, CT, USA) filed patent US2024123456 on March 15, 2024, disclosing ARV-471, a novel PROTAC targeting BRD4 for breast cancer treatment. The compound is currently in Pre-Clinical development stage, showing promising degradation efficiency in vitro.",
+        "crawled_at": "2026-03-17T10:00:00Z",
+        "status": "pending_validation"
+      }
+    },
+    {
+      "case_id": "PASS_002",
+      "description": "中文正例 - 分子胶 IND申请阶段",
+      "expected": "is_met: true",
+      "evidence": {
+        "evidence_id": "E20260317_002",
+        "source_task_id": "T2_ZH_CHINA",
+        "language": "zh",
+        "region": "CN",
+        "source_url": "https://www.yaozh.com/example2",
+        "source_name": "药智网",
+        "raw_text": "百济神州（中国北京）于2025年6月提交专利申请CN202510456789，公开了一种新型分子胶降解剂BGB-3245，靶向IKZF1/3蛋白。该化合物目前处于IND申请阶段，预计2026年启动临床试验。",
+        "crawled_at": "2026-03-17T10:05:00Z",
+        "status": "pending_validation"
+      }
+    },
+    {
+      "case_id": "PASS_003",
+      "description": "日文正例 - LYTAC Phase I",
+      "expected": "is_met: true",
+      "evidence": {
+        "evidence_id": "E20260317_003",
+        "source_task_id": "T3_JA_JAPAN",
+        "language": "ja",
+        "region": "JP",
+        "source_url": "https://www.j-platpat.jp/example3",
+        "source_name": "J-PlatPat",
+        "raw_text": "第一三共株式会社（東京、日本）は2023年12月に特許出願JP2023-987654を公開し、LYTACによるターゲットタンパク質分解技術を用いたDS-6051を開示した。本化合物は第I相臨床試験中であり、固形腫瘍患者を対象としている。",
+        "crawled_at": "2026-03-17T10:10:00Z",
+        "status": "pending_validation"
+      }
+    },
+    {
+      "case_id": "FAIL_001",
+      "description": "失败案例 - 日期超出范围（2022年）",
+      "expected": "is_met: false, failure_rationale: [TIME] Date outside 2023-2026",
+      "evidence": {
+        "evidence_id": "E20260317_004",
+        "source_task_id": "T1_EN_GLOBAL",
+        "language": "en",
+        "region": "US",
+        "source_url": "https://example.com/old-patent",
+        "source_name": "USPTO",
+        "raw_text": "Patent US2022111111 filed on December 20, 2022, describes a PROTAC compound targeting CDK4/6. The compound is in Pre-Clinical stage.",
+        "crawled_at": "2026-03-17T10:15:00Z",
+        "status": "pending_validation"
+      }
+    },
+    {
+      "case_id": "FAIL_002",
+      "description": "失败案例 - 非靶向降解剂（传统小分子）",
+      "expected": "is_met: false, failure_rationale: [MODALITY] No degrader keyword",
+      "evidence": {
+        "evidence_id": "E20260317_005",
+        "source_task_id": "T1_EN_GLOBAL",
+        "language": "en",
+        "region": "US",
+        "source_url": "https://example.com/traditional-drug",
+        "source_name": "PubMed",
+        "raw_text": "Pfizer Inc. filed patent US2024555555 on May 10, 2024, for a small molecule kinase inhibitor PF-12345 targeting EGFR. The compound is in Phase I clinical trials for lung cancer.",
+        "crawled_at": "2026-03-17T10:20:00Z",
+        "status": "pending_validation"
+      }
+    },
+    {
+      "case_id": "FAIL_003",
+      "description": "失败案例 - 临床阶段过晚（Phase II）",
+      "expected": "is_met: false, failure_rationale: [STAGE] Phase II or later",
+      "evidence": {
+        "evidence_id": "E20260317_006",
+        "source_task_id": "T2_ZH_CHINA",
+        "language": "zh",
+        "region": "CN",
+        "source_url": "https://example.com/late-stage",
+        "source_name": "药智网",
+        "raw_text": "恒瑞医药（中国江苏）的PROTAC药物SHR-9876于2024年3月进入二期临床试验，靶向BTK蛋白用于治疗淋巴瘤。专利号CN202410123456。",
+        "crawled_at": "2026-03-17T10:25:00Z",
+        "status": "pending_validation"
+      }
+    },
+    {
+      "case_id": "FAIL_004",
+      "description": "失败案例 - 无法提取国家信息",
+      "expected": "is_met: false, failure_rationale: [ENTITY_COUNTRY] Cannot determine origin",
+      "evidence": {
+        "evidence_id": "E20260317_007",
+        "source_task_id": "T1_EN_GLOBAL",
+        "language": "en",
+        "region": "unknown",
+        "source_url": "https://example.com/no-country",
+        "source_name": "Generic Database",
+        "raw_text": "A novel Molecular Glue compound MG-999 was disclosed in patent application filed on January 15, 2025. The compound targets IKZF2 and is in IND-Enabling stage.",
+        "crawled_at": "2026-03-17T10:30:00Z",
+        "status": "pending_validation"
+      }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+[
+  {
+    "evidence_id": "E_E2E_001",
+    "source_task_id": "T1_EN_GLOBAL",
+    "language": "en",
+    "region": "US",
+    "source_url": "https://pubmed.ncbi.nlm.nih.gov/38123456",
+    "source_name": "PubMed",
+    "raw_text": "Arvinas Inc. (Connecticut, USA) disclosed ARV-825, a PROTAC compound targeting BRD4 for degradation. Patent US2024789012 filed on June 15, 2024. The compound is currently in Pre-Clinical development, demonstrating potent BRD4 degradation in breast cancer cell lines.",
+    "crawled_at": "2026-03-17T12:00:00Z",
+    "status": "pending_validation"
+  },
+  {
+    "evidence_id": "E_E2E_002",
+    "source_task_id": "T2_ZH_CHINA",
+    "language": "zh",
+    "region": "CN",
+    "source_url": "https://www.yaozh.com/patent/CN202410987654",
+    "source_name": "药智网",
+    "raw_text": "中国科学院上海药物研究所于2024年8月申请专利CN202410987654，公开了一种靶向BRD4的PROTAC降解剂SH-BRD4-01。该化合物处于临床前研究阶段，在体外实验中显示出良好的BRD4蛋白降解活性。",
+    "crawled_at": "2026-03-17T12:05:00Z",
+    "status": "pending_validation"
+  },
+  {
+    "evidence_id": "E_E2E_003",
+    "source_task_id": "T3_JA_JAPAN",
+    "language": "ja",
+    "region": "JP",
+    "source_url": "https://www.j-platpat.jp/patent/JP2024-123456",
+    "source_name": "J-PlatPat",
+    "raw_text": "武田薬品工業株式会社（大阪、日本）は2023年11月に特許JP2024-123456を出願し、BRD4を標的とするPROTAC化合物TAK-BRD4を開示した。本化合物は第I相臨床試験の準備段階（IND申請中）にあり、血液がんを対象としている。",
+    "crawled_at": "2026-03-17T12:10:00Z",
+    "status": "pending_validation"
+  },
+  {
+    "evidence_id": "E_E2E_004",
+    "source_task_id": "T1_EN_GLOBAL",
+    "language": "en",
+    "region": "US",
+    "source_url": "https://patents.google.com/patent/US2022555555",
+    "source_name": "Google Patents",
+    "raw_text": "C4 Therapeutics filed patent US2022555555 on November 10, 2022, describing a BRD4-targeting PROTAC. The compound is in Pre-Clinical stage.",
+    "crawled_at": "2026-03-17T12:15:00Z",
+    "status": "pending_validation"
+  },
+  {
+    "evidence_id": "E_E2E_005",
+    "source_task_id": "T2_ZH_CHINA",
+    "language": "zh",
+    "region": "CN",
+    "source_url": "https://example.com/news",
+    "source_name": "医药观察家",
+    "raw_text": "恒瑞医药的BRD4抑制剂HR-BRD4-02于2024年5月进入二期临床试验。该药物采用传统小分子抑制剂技术，非PROTAC降解剂。",
+    "crawled_at": "2026-03-17T12:20:00Z",
+    "status": "pending_validation"
+  }
+]
