@@ -2,14 +2,17 @@
 # LINGNEXUS — Agent 注册脚本（在 setup 容器内运行）
 set -e
 
-CLI="node /app/openclaw.mjs"
+# 确保以 node 用户运行 openclaw 命令
+CLI="runuser -u node -- node /app/openclaw.mjs"
 WORKSPACE="/workspace"
 
 echo "=================================================="
 echo " LINGNEXUS Agent Matrix Registration"
 echo "=================================================="
 
+# 确保 node 用户的 .openclaw 目录存在
 mkdir -p /home/node/.openclaw
+chown -R node:node /home/node/.openclaw
 
 # ══════════════════════════════════════════════════════
 #  Step 1: 注册第三方模型 Provider API Keys
