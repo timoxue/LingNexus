@@ -123,6 +123,13 @@ register_agent "validator"    "${MODEL_VALIDATOR}"
 register_agent "deduplicator" "${MODEL_DEDUPLICATOR}"
 
 # ══════════════════════════════════════════════════════
+#  Step 3.5: 配置 Anthropic Provider（所有 agent）
+# ══════════════════════════════════════════════════════
+echo ""
+echo "--- Step 3.5: Configuring Anthropic provider ---"
+bash /workspace/scripts/configure-anthropic.sh
+
+# ══════════════════════════════════════════════════════
 #  Step 4: 绑定飞书渠道 + 全局配置
 # ══════════════════════════════════════════════════════
 echo ""
