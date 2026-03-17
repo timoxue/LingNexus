@@ -28,6 +28,13 @@ crawler
     supported_languages: [zh, en, ja, ko, de]
     timeout_per_task: 60s
 
+## subagents
+- investigator:
+    allowAgents: ["investigator"]
+    maxConcurrent: 5
+    timeoutSeconds: 60
+    cleanup: delete
+
 ## trigger
 - workflow: biopharma-scouting
 - step: 2

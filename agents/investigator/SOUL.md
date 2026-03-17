@@ -36,16 +36,38 @@ cd /workspace && python3 skills/global_search_skill.py "<query>" "<domain>"
    - 网页数据 → `general_web`
    - 选错路由将导致任务失败
 
-4. **并发执行**：
-   - 使用 Bash 工具的 `run_in_background: true` 参数来并发执行多个搜索任务
-   - 每个任务独立执行，互不阻塞
+4. **并发执行（使用 sessions_spawn）**：
+   - 使用 OpenClaw 原生的 `sessions_spawn` 能力来并发执行多个搜索任务
+   - 每个任务作为独立的 subagent 会话执行，自动管理生命周期
    - 示例：
+   ```python
+   from openclaw import sessions_spawn
+
+   # 为每个任务生成独立的 subagent
+   for task in pending_tasks:
+       task_prompt = f"""
+       执行搜索任务：
+       - 查询词: {task['search_query']}
+       - 语言: {task['language']}
+       - 数据源: {task['target_source']}
+       - 任务ID: {task['task_id']}
+
+       使用 Bash 工具调用：
+       cd /workspace && python3 skills/global_search_skill.py "{task['search_query']}" "{task['target_source']}"
+
+       将结果转换为 Raw_Evidence 格式并写入 /workspace/blackboard/Raw_Evidence.json
+       """
+
+       sessions_spawn(
+           task=task_prompt,
+           label=f"Search-{task['task_id']}",
+           agentId="investigator",
+           runTimeoutSeconds=60,
+           cleanup="delete"
+       )
    ```
-   # 任务 1（后台）
-   Bash(command="cd /workspace && python3 skills/global_search_skill.py 'PROTAC BRD4' 'pubmed'", run_in_background=true)
-   # 任务 2（后台）
-   Bash(command="cd /workspace && python3 skills/global_search_skill.py '靶向蛋白降解' 'pubmed'", run_in_background=true)
-   ```
+   - 所有 subagent 自动并发执行，结果通过 announcement 返回
+   - 主 agent 等待所有 subagent 完成后继续
 
 5. **禁止行为**：
    - ❌ 不得使用任何其他未授权的网络工具或命令
