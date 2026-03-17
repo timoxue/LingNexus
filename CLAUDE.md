@@ -195,14 +195,16 @@ NCBI_EMAIL=your@email.com      # PubMed API
 
 - [x] Gateway 健康检查
 - [x] 5 个智能体注册成功
-- [x] Investigator PubMed 搜索
+- [x] Investigator PubMed 搜索（含 pub_date + affiliation 元数据提取）
 - [x] Investigator 网页抓取
+- [x] Investigator 并发执行（sessions_spawn）
+- [x] Investigator 证据粒度修复（每条搜索结果 = 独立 evidence）
 - [x] Main Agent 飞书关键词触发
 - [x] Coach 任务分解（多语种）
 - [x] 多语种搜索（日文）
-- [ ] Validator 数据验证
-- [ ] Deduplicator 跨语言去重
-- [ ] 完整端到端流程
+- [x] Validator 数据验证（硬规则：TIME + MODALITY + STAGE + COUNTRY）
+- [x] Deduplicator 跨语言去重（ARV-471/ARV471 合并识别）
+- [x] 完整端到端流程（Investigator → Validator → Deduplicator）
 
 ## 维护命令
 
@@ -228,6 +230,21 @@ docker volume rm lingnexus-openclaw-state
 - **后续启动**: <10s (快速启动)
 - **PubMed 搜索**: ~2-5s (10 条结果)
 - **网页抓取**: ~5-15s (取决于目标网站)
+
+## 端到端测试结果（2026-03-17）
+
+| 阶段 | Agent | 输入 | 输出 | 耗时 |
+|------|-------|------|------|------|
+| 搜索 | Investigator | 2 tasks | 17 evidence (含 pub_date/affiliation) | 117s |
+| 校验 | Validator | 17 evidence | 6 validated / 11 rejected | 40s |
+| 去重 | Deduplicator | 6 validated | 5 final assets (1组去重) | 64s |
+
+**最终输出示例：**
+- ORM-5029 (IN, Phase I, DAC)
+- VVD-065 (US, Phase I, NRF2 Molecular Glue, NCT05954312)
+- KT-413 (US, IRAK4 Molecular Glue)
+- E7820 (JP, Preclinical, RBM39 Molecular Glue)
+- 未命名 PROTAC (CN, Preclinical)
 
 ---
 
