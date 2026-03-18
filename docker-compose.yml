@@ -5,7 +5,7 @@ services:
     image: lingnexus:latest
     container_name: lingnexus-gateway
     restart: unless-stopped
-    user: node  # 使用 node 用户运行
+    user: root  # 需要 root 权限安装依赖，启动脚本会切换到 node 用户
     ports:
       - "18789:18789"
     volumes:
