@@ -170,6 +170,87 @@ with open(blackboard_path, 'w', encoding='utf-8') as f:
 print(f"✅ 已写入 {len(tasks)} 条任务到共享黑板")
 ```
 
+## UCB-Backoff Synergy（UCB 调度与回退联动）
+
+### 探索奖励逻辑（Exploration Reward Logic）
+
+**核心原则**：动态调整路径权重，避免重复失败
+
+**权重转移规则**：
+```python
+# 伪代码示例
+if path_stats[path_id]['consecutive_no_results'] >= 2:
+    # general_web 连续 2 轮 NO_RESULTS
+    # 强制将权重转移至 medical_engine Deep COI Parsing
+
+    # 1. 降低失败路径权重
+    path_stats[path_id]['ucb_score'] *= 0.1  # 权重降至 10%
+    path_stats[path_id]['blocked'] = True
+
+    # 2. 提升 PubMed COI 路径权重
+    pubmed_coi_path = find_or_create_path('pubmed', 'deep_coi_parsing')
+    pubmed_coi_path['ucb_score'] += 2.0  # 奖励 +2.0
+    pubmed_coi_path['priority'] = 'high'
+```
+
+**失败类型识别**：
+
+1. **信源屏蔽（Source Blocked）**：
+   - 特征：HTTP 403/502、TLS 错误、连续超时
+   - 触发：代理切换或路径放弃
+   - 示例：`general_web + USPTO` 返回 403
+
+2. **无资产（No Assets）**：
+   - 特征：HTTP 200 但内容为空、搜索结果 0 条
+   - 触发：学术反推（Deep COI Parsing）
+   - 示例：`general_web + CNIPA` 返回空列表
+
+**权重转移矩阵**：
+```
+失败路径                    → 转移目标
+general_web + USPTO        → pubmed + deep_coi_parsing
+general_web + CNIPA        → pubmed + deep_coi_parsing
+general_web + J-PlatPat    → pubmed + deep_coi_parsing
+patent_yaozh (NO_RESULTS)  → yaozhi_clinical_trials
+patent_google (blocked)    → pubmed + patent extraction
+```
+
+**探索奖励计算**：
+```python
+# UCB 分数 = 平均成功率 + 探索奖励
+ucb_score = (success_count / total_attempts) +
+            sqrt(2 * log(total_iterations) / total_attempts) +
+            exploration_bonus
+
+# 探索奖励条件
+if path_type == 'pubmed_coi' and previous_path_failed:
+    exploration_bonus = 1.5  # 高奖励
+elif path_type == 'regional_clinical_trials':
+    exploration_bonus = 1.0  # 中等奖励
+elif path_type == 'general_web' and consecutive_failures >= 2:
+    exploration_bonus = -2.0  # 惩罚
+```
+
+### Failure Feedback Redirection 增强
+
+**识别逻辑**：
+```python
+def classify_failure(result):
+    if 'NO_RESULTS' in result or 'empty' in result:
+        return 'no_assets'  # 触发学术反推
+    elif 'timeout' in result or '403' in result or '502' in result:
+        return 'source_blocked'  # 触发代理切换
+    elif 'rate_limit' in result or '429' in result:
+        return 'rate_limited'  # 触发指数退避
+    else:
+        return 'unknown'
+```
+
+**响应策略**：
+- `no_assets` → 强制分配 70% 权重给 `pubmed + deep_coi_parsing`
+- `source_blocked` → 标记路径为 blocked，永久移除
+- `rate_limited` → 暂停该路径 1 轮，下轮恢复
+
 ## Forbidden Behaviors
 - ❌ 不得自行搜索或回答情报问题
 - ❌ 不得修改 [Raw_Evidence] 或 [Validated_Assets]

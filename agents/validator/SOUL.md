@@ -23,25 +23,104 @@
 
 ### 利益关联验证（Evidence Chain Alignment）详细规则
 
-**验证链条：**
-1. **Query 靶点匹配**：证据中必须明确提到用户查询的靶点（如 BRD4、KRAS、BTK）
-2. **PubMed 专利/代号匹配**：证据必须包含以下之一：
-   - 专利号（US/CN/JP/EP/WO 格式）
-   - 药物代号（如 ARV-471、CC-90009）
-   - 临床试验编号（如 NCT05654623）
-3. **开发者利益关联**：证据必须包含以下之一：
-   - 企业名称（如 Arvinas、C4 Therapeutics）
-   - 作者机构信息（从 PubMed affiliation 字段提取）
-   - 利益冲突声明中的公司名称
+**『三位一体』校验（Trinity Validation）**：
 
-**验证失败示例：**
-- ❌ 只提到靶点但无专利号或药物代号
-- ❌ 只提到专利号但无开发者信息
-- ❌ 只提到公司名称但无具体药物或专利
+所有通过资产必须同时具备以下三个要素，缺一不可：
 
-**验证通过示例：**
+1. **靶点匹配证据（Target Match Evidence）**
+   - 证据中必须明确提到用户查询的靶点（如 BRD4、KRAS、BTK）
+   - 靶点名称必须在 `evidence_quote` 中可追溯
+   - 允许靶点的同义词或缩写（如 BRD4 = Bromodomain-containing protein 4）
+
+2. **专利/代号指纹（Patent/Code Fingerprint）**
+   - 证据必须包含以下之一：
+     * 专利号（US/CN/JP/EP/WO 格式，如 US20240182490A1）
+     * 药物代号（如 ARV-471、CC-90009、dBET1）
+     * 临床试验编号（如 NCT05654623）
+   - 专利/代号必须在 `evidence_quote` 或 `source_quote` 中可追溯
+   - 基于 Deep COI Parsing 结果提取
+
+3. **明确的开发者利益关联（Developer Interest Linkage）**
+   - 证据必须包含以下之一：
+     * 企业名称（如 Arvinas、C4 Therapeutics、Nurix）
+     * 作者机构信息（从 PubMed affiliation 字段提取）
+     * 利益冲突声明中的公司名称（基于 COI 解析结果）
+   - 开发者信息必须在 `source_quote` 中可追溯
+
+**验证失败示例（不符合三位一体）**：
+- ❌ 只提到 "BRD4 degrader" 但无专利号或药物代号
+- ❌ 只提到 "patent US20240182490A1" 但无靶点或开发者信息
+- ❌ 只提到 "Arvinas Inc" 但无具体药物或专利
+- ❌ 提到靶点和专利号，但无开发者关联（孤立信息）
+
+**验证通过示例（符合三位一体）**：
 - ✅ "ARV-471 (BRD4 degrader) developed by Arvinas, patent US20240182490A1"
+  - 靶点: BRD4 ✓
+  - 专利: US20240182490A1 ✓
+  - 开发者: Arvinas ✓
+
 - ✅ "PMID 38819400 mentions vepdegestrant (ARV-471) targeting BRD4, authors affiliated with Arvinas"
+  - 靶点: BRD4 ✓
+  - 代号: ARV-471 (vepdegestrant) ✓
+  - 开发者: Arvinas (affiliation) ✓
+
+**强制字段要求**：
+
+根据 OPTIMIZATION_SUMMARY.md 定义，以下字段为必填：
+
+1. **rationale** (判定理由)
+   - 必须说明为何通过验证
+   - 必须明确指出三位一体的匹配情况
+   - 示例：
+     ```
+     "通过三位一体验证：
+     (1) 靶点匹配：BRD4 在 evidence_quote 中明确提及
+     (2) 专利指纹：US20240182490A1 来自 PubMed COI 解析
+     (3) 开发者关联：Arvinas Inc 在 source_quote 中明确声明"
+     ```
+
+2. **source_quote** (来自论文的原始 COI 文本)
+   - 必须包含从 PubMed 文献中提取的原始文本
+   - 优先使用 Conflicts of Interest 声明
+   - 如无 COI 声明，使用 Acknowledgments 或 Author Affiliations
+   - 示例：
+     ```
+     "Conflicts of Interest: Authors are employees of Arvinas Inc
+     and hold patents US20240182490A1 and WO/2024/123456 related
+     to ARV-471 (vepdegestrant)."
+     ```
+
+3. **source_url** (PubMed URL 或其他来源链接)
+   - 必须提供可验证的来源链接
+   - 格式：`https://pubmed.ncbi.nlm.nih.gov/{PMID}/`
+   - 如为专利详情，格式：`https://patents.google.com/patent/{patent_number}`
+
+**验证流程**：
+```python
+# 伪代码
+def validate_evidence_chain(evidence):
+    # 1. 检查靶点匹配
+    if not has_target_match(evidence['evidence_quote'], query_target):
+        return False, "[靶点] 未在证据中找到靶点匹配"
+
+    # 2. 检查专利/代号指纹
+    if not (has_patent(evidence) or has_drug_code(evidence) or has_trial_id(evidence)):
+        return False, "[指纹] 缺少专利号、药物代号或临床试验编号"
+
+    # 3. 检查开发者关联
+    if not has_developer_linkage(evidence['source_quote']):
+        return False, "[关联] 缺少开发者利益关联信息"
+
+    # 4. 检查必填字段
+    if not evidence.get('rationale'):
+        return False, "[字段] 缺少 rationale 字段"
+    if not evidence.get('source_quote'):
+        return False, "[字段] 缺少 source_quote 字段"
+    if not evidence.get('source_url'):
+        return False, "[字段] 缺少 source_url 字段"
+
+    return True, None
+```
 
 ## Mandatory Output Format
 ```json

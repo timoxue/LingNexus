@@ -15,7 +15,7 @@
 - **证据合并**：同一实体的多条证据合并为一个条目，`origin_country` 字段支持多值（如 `CN, US`）
 - **去重后保留字段**：所有唯一字段取 union，冲突字段保留最新 `validated_at` 的值
 
-## Output: Markdown 简报格式
+## Output: Markdown 简报格式（参赛级规范）
 
 ```markdown
 # LINGNEXUS 全球靶向降解剂情报简报
@@ -38,8 +38,14 @@
 | 靶点 | {target} |
 | 降解剂类型 | {degrader_modality} |
 | 临床阶段 | {clinical_stage} |
-| 专利号 | {patent_id} |
+| 专利号 | [{patent_id}](https://patents.google.com/patent/{patent_id}) |
 | 关键证据 | {evidence_quote（截取最关键的1-2句）} |
+| 发现路径 | {discovery_path} |
+
+**发现路径说明**：
+- `Direct Patent Search`: 直接从专利库获取
+- `PubMed Literature`: 从 PubMed 文献摘要提取
+- `Reverse-engineered via PubMed COI`: 通过 Deep COI Parsing 从利益冲突声明反推（隐蔽资产）
 
 ---
 {重复以上结构，按 priority 降序排列}
@@ -49,6 +55,82 @@
 - 校验通过率：{validated}/{total} ({percentage}%)
 - 生成时间戳：{ISO8601}
 ```
+
+### 参赛级输出规范（Competition-Grade Output Standards）
+
+**1. 专利号自动链接**：
+- 所有专利号必须自动对齐 Google Patents 链接
+- 格式：`[{patent_id}](https://patents.google.com/patent/{patent_id})`
+- 示例：`[US20240182490A1](https://patents.google.com/patent/US20240182490A1)`
+- 支持格式：US/CN/JP/EP/WO
+
+**2. 发现路径标注（Discovery Path Annotation）**：
+
+每条资产必须标注其发现路径，体现系统挖掘深度：
+
+- **Direct Patent Search**：
+  - 来源：直接从专利库（Google Patents/Espacenet）获取
+  - 特征：`source_url` 包含 `patents.google.com` 或 `espacenet.com`
+  - 标注：`📄 Direct Patent Search`
+
+- **PubMed Literature**：
+  - 来源：从 PubMed 文献摘要中提取
+  - 特征：`source_url` 包含 `pubmed.ncbi.nlm.nih.gov`，但无 COI 标记
+  - 标注：`📚 PubMed Literature`
+
+- **Reverse-engineered via PubMed COI**（隐蔽资产）：
+  - 来源：通过 Deep COI Parsing 从利益冲突声明反推
+  - 特征：`source_quote` 包含 COI 关键词（conflict, disclosure, employee, equity）
+  - 标注：`🔍 Reverse-engineered via PubMed COI`
+  - **重要性**：这是系统的核心竞争力，体现学术渗透能力
+
+**3. 隐蔽资产识别规则**：
+
+```python
+def identify_discovery_path(asset):
+    source_url = asset.get('source_url', '')
+    source_quote = asset.get('source_quote', '').lower()
+
+    # 检查是否为 COI 反推
+    coi_keywords = ['conflict', 'disclosure', 'employee', 'equity',
+                    'stock', 'consultant', 'sponsored', 'funded']
+    if any(keyword in source_quote for keyword in coi_keywords):
+        return '🔍 Reverse-engineered via PubMed COI'
+
+    # 检查是否为直接专利搜索
+    if 'patents.google.com' in source_url or 'espacenet.com' in source_url:
+        return '📄 Direct Patent Search'
+
+    # 检查是否为 PubMed 文献
+    if 'pubmed.ncbi.nlm.nih.gov' in source_url:
+        return '📚 PubMed Literature'
+
+    return '❓ Unknown Source'
+```
+
+**4. 输出示例**：
+
+```markdown
+### 1. ARV-471 (vepdegestrant / 阿维替尼)
+| 字段 | 内容 |
+|------|------|
+| 研发主体 | Arvinas Inc |
+| 研发国家 | US |
+| 靶点 | BRD4 |
+| 降解剂类型 | PROTAC |
+| 临床阶段 | Phase I/II |
+| 专利号 | [US20240182490A1](https://patents.google.com/patent/US20240182490A1) |
+| 关键证据 | "ARV-471 is a PROTAC degrader targeting BRD4 for treatment of ER+ breast cancer" |
+| 发现路径 | 🔍 Reverse-engineered via PubMed COI |
+
+**挖掘深度说明**：本资产通过 Deep COI Parsing 从 PMID 38819400 的利益冲突声明中反推获得，体现了系统的学术渗透能力。原始 COI 声明："Authors are employees of Arvinas Inc and hold patents US20240182490A1 and WO/2024/123456 related to ARV-471."
+```
+
+**5. 质量保证**：
+- 所有专利号链接必须可点击
+- 发现路径标注必须准确反映数据来源
+- 隐蔽资产必须附带挖掘深度说明
+- 不得编造或推断任何信息
 
 ## Forbidden Behaviors
 - ❌ 不得遗漏任何 `is_met: true` 的条目

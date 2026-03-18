@@ -7,11 +7,17 @@ L1 引擎层：医疗数据库检索引擎
 - 从 PubMed 全文中提取 Conflicts of Interest 声明
 - 使用正则匹配专利号（WO/US/CN/JP/EP 格式）
 - 提取企业授权信息和 Startup 项目线索
+
+优化：指数退避重试机制
+- PubMed API 调用超时时自动重试
+- 最大重试次数：3 次
+- 退避策略：1s, 2s, 4s
 """
 
 import os
 import sys
 import re
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -20,6 +26,42 @@ try:
     BIOPYTHON_AVAILABLE = True
 except ImportError:
     BIOPYTHON_AVAILABLE = False
+
+# 重试配置
+MAX_RETRIES = 3
+INITIAL_BACKOFF_S = 1
+
+
+def _retry_with_backoff(func, *args, **kwargs):
+    """
+    指数退避重试装饰器
+
+    Args:
+        func: 要重试的函数
+        *args, **kwargs: 函数参数
+
+    Returns:
+        函数返回值
+
+    Raises:
+        最后一次尝试的异常
+    """
+    last_exception = None
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            last_exception = e
+            if attempt < MAX_RETRIES - 1:
+                backoff_s = INITIAL_BACKOFF_S * (2 ** attempt)
+                print(f"⚠️ PubMed API 调用失败 (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
+                print(f"   等待 {backoff_s}s 后重试...")
+                time.sleep(backoff_s)
+            else:
+                print(f"❌ PubMed API 调用失败，已达最大重试次数")
+
+    raise last_exception
 
 
 def search_medical_db(query: str, source: str = 'pubmed', max_results: int = 10) -> str:
@@ -50,30 +92,37 @@ def search_medical_db(query: str, source: str = 'pubmed', max_results: int = 10)
 
         Entrez.email = email
 
-        # 执行检索
-        search_handle = Entrez.esearch(
-            db="pubmed",
-            term=query,
-            retmax=max_results,
-            sort="relevance"
-        )
-        search_results = Entrez.read(search_handle)
-        search_handle.close()
+        # 执行检索（带重试）
+        def _search():
+            handle = Entrez.esearch(
+                db="pubmed",
+                term=query,
+                retmax=max_results,
+                sort="relevance"
+            )
+            results = Entrez.read(handle)
+            handle.close()
+            return results
 
+        search_results = _retry_with_backoff(_search)
         id_list = search_results.get("IdList", [])
 
         if not id_list:
             return f"医疗数据库检索结果为空: 关键词 '{query}' 未找到相关文献"
 
-        # 获取文章摘要
-        fetch_handle = Entrez.efetch(
-            db="pubmed",
-            id=id_list,
-            rettype="abstract",
-            retmode="xml"
-        )
-        articles = Entrez.read(fetch_handle)
-        fetch_handle.close()
+        # 获取文章摘要（带重试）
+        def _fetch():
+            handle = Entrez.efetch(
+                db="pubmed",
+                id=id_list,
+                rettype="abstract",
+                retmode="xml"
+            )
+            articles = Entrez.read(handle)
+            handle.close()
+            return articles
+
+        articles = _retry_with_backoff(_fetch)
 
         # 格式化输出
         results = []
