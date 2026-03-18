@@ -7,6 +7,24 @@
 ## ⚠️ 武器装配：企业级搜索网关
 **你已经被配置了专用的企业级搜索网关。你唯一合法的获取外部信息的武器是通过 Bash 工具调用 `skills/global_search_skill.py`。**
 
+### 数据源优先级策略（重要）
+
+**优先级 1：PubMed（主要数据源）**
+- ✅ 支持 API，数据质量高，结构化输出
+- ✅ 包含大量专利相关的文献和综述
+- ✅ 每篇文献可能提到多个专利号
+- 🎯 **推荐用于所有医药专利情报挖掘任务**
+
+**优先级 2：Google Patents（专利补充）**
+- ✅ 相对容易抓取，多语言支持
+- ⚠️ 动态渲染，数据提取有限
+- 🎯 用于验证 PubMed 中提到的专利号
+
+**优先级 3：其他专利库（谨慎使用）**
+- ❌ 药智网、CNIPA、J-PlatPat 需要动态渲染支持
+- ❌ 当前配置下数据提取效果差
+- 🎯 仅在有具体专利号需要验证时使用
+
 ### 武器使用规则（极其严厉）
 
 **调用格式**：
@@ -25,20 +43,39 @@ cd /workspace && python3 skills/global_search_skill.py "<query>" "<domain>"
    - 返回 JSON 数组，每个元素包含 `pmid`, `title`, `abstract`, `url` 字段
 
 2. **网页数据抓取**：
-   - 当你需要从公开网站获取数据（专利数据库、公司官网、新闻报道）时
+   - 当你需要从公开网站获取数据（公司官网、新闻报道）时
    - 传入目标 URL，将 `domain` 设置为 `general_web`
    - 示例：
    ```bash
    cd /workspace && python3 skills/global_search_skill.py "https://clinicaltrials.gov/..." "general_web"
    ```
 
-3. **精准路由**：
+3. **专利数据库检索**（新增）：
+   - 当你需要查询专利信息时，使用专利数据库域
+   - 支持的专利数据库：
+     - `patent_yaozh` - 药智网（中国专利，中文）
+     - `patent_cnipa` - 中国国家知识产权局（官方，中文）
+     - `patent_jplatpat` - 日本专利库（日文）
+     - `patent_google` - Google Patents（多语言）
+     - `patent_espacenet` - 欧洲专利局（多语言）
+   - 示例：
+   ```bash
+   cd /workspace && python3 skills/global_search_skill.py "PROTAC BRD4" "patent_google"
+   cd /workspace && python3 skills/global_search_skill.py "靶向降解剂" "patent_yaozh"
+   cd /workspace && python3 skills/global_search_skill.py "BRD4 分解誘導剤" "patent_jplatpat"
+   ```
+
+4. **精准路由**：
    - 你必须根据并发任务的要求，极其精准地选择 `domain` 路由
    - 医学文献 → `pubmed`
    - 网页数据 → `general_web`
+   - 中国专利 → `patent_yaozh` 或 `patent_cnipa`
+   - 日本专利 → `patent_jplatpat`
+   - 多语言专利 → `patent_google`
+   - 欧洲专利 → `patent_espacenet`
    - 选错路由将导致任务失败
 
-4. **并发执行（使用 sessions_spawn）**：
+5. **并发执行（使用 sessions_spawn）**：
    - 使用 OpenClaw 原生的 `sessions_spawn` 能力来并发执行多个搜索任务
    - 每个任务作为独立的 subagent 会话执行，自动管理生命周期
    - 示例：

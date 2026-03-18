@@ -22,7 +22,7 @@ if [ ! -f "$INSTALL_MARKER" ]; then
     # 安装浏览器依赖
     echo "  → 安装浏览器依赖..."
     apt-get install -y --no-install-recommends --fix-missing \
-        xvfb libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+        xvfb dbus libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
         libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
         libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 \
         > /dev/null 2>&1 || true
@@ -39,6 +39,13 @@ else
     echo "✅ 依赖已安装，快速启动"
 fi
 
+# 启动 D-Bus（Chrome 需要）
+if command -v dbus-daemon &> /dev/null; then
+    mkdir -p /run/dbus
+    rm -f /run/dbus/pid
+    dbus-daemon --system --fork &> /dev/null || true
+fi
+
 # 启动虚拟显示服务器
 if command -v Xvfb &> /dev/null; then
     Xvfb :99 -screen 0 1280x1024x24 &> /dev/null &
@@ -46,18 +53,28 @@ if command -v Xvfb &> /dev/null; then
     export DISPLAY=:99
 fi
 
-# 切换到 node 用户并启动 OpenClaw Gateway
-# 重要：传递所有环境变量给 node 用户
+# 启动 OpenClaw Gateway
 echo "🚀 启动 OpenClaw Gateway..."
-exec runuser -u node -- bash -c "
-  export ANTHROPIC_OAUTH_TOKEN='${ANTHROPIC_OAUTH_TOKEN}'
-  export ANTHROPIC_API_KEY='${ANTHROPIC_API_KEY}'
-  export ANTHROPIC_BASE_URL='${ANTHROPIC_BASE_URL}'
-  export MOONSHOT_API_KEY='${MOONSHOT_API_KEY}'
-  export GOOGLE_API_KEY='${GOOGLE_API_KEY}'
-  export OPENROUTER_API_KEY='${OPENROUTER_API_KEY}'
-  export NCBI_EMAIL='${NCBI_EMAIL}'
-  export OPENCLAW_LOG_LEVEL='${OPENCLAW_LOG_LEVEL}'
-  export DISPLAY=:99
-  cd /app && node openclaw.mjs gateway --allow-unconfigured --port 18789 --bind loopback --auth ${OPENCLAW_AUTH_MODE:-none}
-"
+
+# 检查当前用户
+CURRENT_USER=$(whoami)
+
+if [ "$CURRENT_USER" = "node" ]; then
+    # 已经是 node 用户，直接启动
+    export DISPLAY=:99
+    cd /app && exec node openclaw.mjs gateway --allow-unconfigured --port 18789 --bind loopback --auth ${OPENCLAW_AUTH_MODE:-none}
+else
+    # root 用户，需要切换到 node 用户
+    exec runuser -u node -- bash -c "
+      export ANTHROPIC_OAUTH_TOKEN='${ANTHROPIC_OAUTH_TOKEN}'
+      export ANTHROPIC_API_KEY='${ANTHROPIC_API_KEY}'
+      export ANTHROPIC_BASE_URL='${ANTHROPIC_BASE_URL}'
+      export MOONSHOT_API_KEY='${MOONSHOT_API_KEY}'
+      export GOOGLE_API_KEY='${GOOGLE_API_KEY}'
+      export OPENROUTER_API_KEY='${OPENROUTER_API_KEY}'
+      export NCBI_EMAIL='${NCBI_EMAIL}'
+      export OPENCLAW_LOG_LEVEL='${OPENCLAW_LOG_LEVEL}'
+      export DISPLAY=:99
+      cd /app && node openclaw.mjs gateway --allow-unconfigured --port 18789 --bind loopback --auth ${OPENCLAW_AUTH_MODE:-none}
+    "
+fi

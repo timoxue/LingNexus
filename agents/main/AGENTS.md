@@ -20,7 +20,26 @@ gateway
 - trigger_workflow
 
 ## tools
-[]
+[
+  {
+    "name": "send_message",
+    "description": "Send a message to another agent via ACP (Agent Control Protocol)",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "agent": {
+          "type": "string",
+          "description": "Target agent ID (e.g., 'coach', 'investigator')"
+        },
+        "message": {
+          "type": "string",
+          "description": "Message content to send to the agent"
+        }
+      },
+      "required": ["agent", "message"]
+    }
+  }
+]
 
 ## on_message
 1. Extract `user_query` from incoming message

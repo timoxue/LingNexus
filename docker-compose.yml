@@ -5,7 +5,7 @@ services:
     image: lingnexus:latest
     container_name: lingnexus-gateway
     restart: unless-stopped
-    user: root  # 需要 root 权限安装依赖并切换到 node 用户
+    user: node  # 使用 node 用户运行
     ports:
       - "18789:18789"
     volumes:
@@ -25,6 +25,9 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       # ── 医疗数据库 API ─────────────────────────────────────
       NCBI_EMAIL: ${NCBI_EMAIL:-}
+      # ── 飞书 Bot 配置 ──────────────────────────────────────
+      FEISHU_APP_ID: ${FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
       # ── 运行时配置 ─────────────────────────────────────────
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_LOG_LEVEL: ${OPENCLAW_LOG_LEVEL:-info}
@@ -75,6 +78,20 @@ services:
       echo '📝 注册 Agents...' &&
       bash /workspace/scripts/register-agents.sh
       "
+
+  # Anthropic API 代理服务（Node.js）
+  anthropic-proxy:
+    image: node:24-slim
+    container_name: lingnexus-anthropic-proxy
+    restart: unless-stopped
+    ports:
+      - "18790:18790"
+    volumes:
+      - ./proxy-server.js:/app/proxy-server.js:ro
+    working_dir: /app
+    command: ["node", "proxy-server.js"]
+    networks:
+      - default
 
 volumes:
   openclaw-state:

@@ -14,12 +14,18 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from engines.medical_engine import search_medical_db, search_medical_db_json
 from engines.browser_engine import fetch_webpage_content
+from engines.patent_engine import search_patent_db, PatentDatabase
 
 
 class SearchDomain(str, Enum):
     """搜索域枚举"""
     PUBMED = "pubmed"
     GENERAL_WEB = "general_web"
+    PATENT_YAOZH = "patent_yaozh"
+    PATENT_CNIPA = "patent_cnipa"
+    PATENT_JPLATPAT = "patent_jplatpat"
+    PATENT_GOOGLE = "patent_google"
+    PATENT_ESPACENET = "patent_espacenet"
 
 
 def global_intelligence_search(query: str, domain: str, output_format: str = 'text') -> str:
@@ -58,8 +64,29 @@ def global_intelligence_search(query: str, domain: str, output_format: str = 'te
             result = fetch_webpage_content(query, timeout=15)
             return f"=== 网页抓取结果 ===\nURL: {query}\n\n{result}"
 
+        elif domain_lower == SearchDomain.PATENT_YAOZH:
+            result = search_patent_db(query, PatentDatabase.YAOZH)
+            return result
+
+        elif domain_lower == SearchDomain.PATENT_CNIPA:
+            result = search_patent_db(query, PatentDatabase.CNIPA)
+            return result
+
+        elif domain_lower == SearchDomain.PATENT_JPLATPAT:
+            result = search_patent_db(query, PatentDatabase.JPLATPAT)
+            return result
+
+        elif domain_lower == SearchDomain.PATENT_GOOGLE:
+            result = search_patent_db(query, PatentDatabase.GOOGLE_PATENTS)
+            return result
+
+        elif domain_lower == SearchDomain.PATENT_ESPACENET:
+            result = search_patent_db(query, PatentDatabase.ESPACENET)
+            return result
+
         else:
-            return f"错误: 不支持的 domain '{domain}'，仅支持 'pubmed' 或 'general_web'"
+            supported = "pubmed, general_web, patent_yaozh, patent_cnipa, patent_jplatpat, patent_google, patent_espacenet"
+            return f"错误: 不支持的 domain '{domain}'，支持的域: {supported}"
 
     except Exception as e:
         # 最后一层兜底防线
