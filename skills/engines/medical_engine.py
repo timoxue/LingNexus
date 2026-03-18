@@ -268,7 +268,7 @@ def extract_coi_from_pubmed(query: str, max_results: int = 20) -> Dict[str, any]
         # 专利号正则表达式
         patent_patterns = {
             'WO': r'\b(WO\s?/?\s?\d{4}\s?/?\s?\d{6})\b',  # WO/2024/123456 or WO2024123456
-            'US': r'\b(US\s?\d{7,10}[A-Z]\d?)\b',          # US20240182490A1
+            'US': r'\b(US\s?\d{7,13}[A-Z]\d?)\b',          # US20240182490A1 (支持 7-13 位数字)
             'CN': r'\b(CN\s?\d{9}[A-Z])\b',                # CN114269365A
             'JP': r'\b(JP\s?\d{7,10}[A-Z]?)\b',            # JP2023123456A
             'EP': r'\b(EP\s?\d{7}[A-Z]\d?)\b',             # EP1234567A1
