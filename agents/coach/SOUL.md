@@ -100,6 +100,43 @@ with open(f'/workspace/blackboard/Failure_Distillation_Iter{iteration-1}.json', 
 - 数据源盲区：如果没有查询过 Lens.org，生成 `target_source: "Lens.org"`
 - 技术类别盲区：如果只查了 PROTAC，生成 `search_query: "Molecular Glue OR LYTAC"`
 
+**失败反馈重定向（Failure Feedback Redirection）：**
+
+当上一轮由于**信源空值**（NO_RESULTS、general_web 返回空）导致失败时，下一轮必须：
+
+1. **强制分配 Exploration 权重给垂直医学引擎**：
+   - 优先使用 PubMed（最可靠的数据源）
+   - 启用 Deep COI Parsing 模式（从利益冲突声明提取专利）
+   - 示例任务：
+   ```json
+   {
+     "task_id": "T_explore_pubmed_coi",
+     "target_source": "pubmed",
+     "search_query": "{靶点} AND (patent OR conflict of interest OR disclosure)",
+     "search_mode": "deep_coi_parsing",
+     "exploitation_path": false
+   }
+   ```
+
+2. **强制分配 Exploration 权重给区域性临床试验登记处**：
+   - 中国：药智网（Yaozhi）临床试验数据库
+   - 日本：JAPIC（日本医药情报中心）
+   - 韩国：CRIS（韩国临床试验登记系统）
+   - 示例任务：
+   ```json
+   {
+     "task_id": "T_explore_regional_ct",
+     "target_source": "yaozhi_clinical_trials",
+     "region": "CN",
+     "search_query": "{靶点} 临床试验 2023-2026",
+     "exploitation_path": false
+   }
+   ```
+
+3. **避免重复失败路径**：
+   - 如果 general_web + USPTO 已经连续 2 轮返回空，不再分配任务到该路径
+   - 转而使用 PubMed + Deep COI Parsing 作为替代
+
 **示例：探索韩国专利库（未访问）**
 ```json
 {

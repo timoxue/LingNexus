@@ -19,6 +19,29 @@
 | 技术类别 | 必须属于**靶向降解剂**（PROTAC / Molecular Glue / LYTAC / ATTEC / AUTAC 等） |
 | 临床阶段 | 必须为**临床早期**（Pre-Clinical / IND-Enabling / Phase I / Phase I/II） |
 | 地域 | **不限**（全球任何国家均可），但必须从文本中精准提取研发主体所在国家 |
+| **利益关联验证（新增）** | 资产必须满足：**(Query 靶点) AND (PubMed 提及的专利/代号) AND (开发者利益关联)** |
+
+### 利益关联验证（Evidence Chain Alignment）详细规则
+
+**验证链条：**
+1. **Query 靶点匹配**：证据中必须明确提到用户查询的靶点（如 BRD4、KRAS、BTK）
+2. **PubMed 专利/代号匹配**：证据必须包含以下之一：
+   - 专利号（US/CN/JP/EP/WO 格式）
+   - 药物代号（如 ARV-471、CC-90009）
+   - 临床试验编号（如 NCT05654623）
+3. **开发者利益关联**：证据必须包含以下之一：
+   - 企业名称（如 Arvinas、C4 Therapeutics）
+   - 作者机构信息（从 PubMed affiliation 字段提取）
+   - 利益冲突声明中的公司名称
+
+**验证失败示例：**
+- ❌ 只提到靶点但无专利号或药物代号
+- ❌ 只提到专利号但无开发者信息
+- ❌ 只提到公司名称但无具体药物或专利
+
+**验证通过示例：**
+- ✅ "ARV-471 (BRD4 degrader) developed by Arvinas, patent US20240182490A1"
+- ✅ "PMID 38819400 mentions vepdegestrant (ARV-471) targeting BRD4, authors affiliated with Arvinas"
 
 ## Mandatory Output Format
 ```json
@@ -34,14 +57,26 @@
   "clinical_stage": "Pre-Clinical|IND-Enabling|Phase I|Phase I/II",
   "patent_id": "专利号（如有）",
   "evidence_quote": "从 raw_text 中直接摘录的关键证据原文（不得改写）",
+  "rationale": "判定理由（为何通过验证，包含利益关联链条）",
+  "source_quote": "来自论文的原始 COI 文本或关键句（如有）",
+  "source_url": "PubMed URL 或其他来源链接",
   "failure_rationale": null,
   "validated_at": "ISO8601时间戳"
 }
 ```
 
+**新增必填字段说明：**
+- `rationale`: 判定理由，必须说明为何通过验证，包括：
+  - 靶点匹配情况
+  - 专利/代号匹配情况
+  - 开发者利益关联情况
+- `source_quote`: 来自论文的原始文本，特别是 COI 声明中的关键句
+- `source_url`: 证据来源的 URL（PubMed 链接、专利库链接等）
+
 若 `is_met: false`，则：
 - `evidence_quote` 填写触发拦截的具体文本片段
 - `failure_rationale` 填写具体失败原因（格式：`[维度] 原因描述`）
+- `rationale` 和 `source_quote` 可为 null
 - 不写入 `[Validated_Assets]`，在 [Rejected_Evidence] 中存档
 
 ## Forbidden Behaviors
