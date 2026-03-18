@@ -15,76 +15,46 @@ mkdir -p /home/node/.openclaw
 chown -R node:node /home/node/.openclaw
 
 # ══════════════════════════════════════════════════════
-#  Step 1: 注册第三方模型 Provider API Keys
+#  Step 1: 注册 Anthropic Provider（统一走代理）
 # ══════════════════════════════════════════════════════
 echo ""
-echo "--- Step 1: Registering provider API keys ---"
+echo "--- Step 1: Registering Anthropic provider ---"
 
-register_provider() {
-  local PROVIDER=$1
-  local KEY_VAR=$2
-  local KEY_VAL="${!KEY_VAR}"
-
-  if [ -z "${KEY_VAL}" ] || [[ "${KEY_VAL}" == *"xxx"* ]]; then
-    echo "  [SKIP] ${PROVIDER}: ${KEY_VAR} not set"
-    return 0
-  fi
-
-  echo "  Registering provider: ${PROVIDER}"
-  echo "${KEY_VAL}" | $CLI models auth paste-token \
-    --provider "${PROVIDER}" \
-    --profile-id "${PROVIDER}:auto" \
-    2>/dev/null \
-    && echo "  [OK] ${PROVIDER} key registered" \
-    || echo "  [WARN] ${PROVIDER} registration issue, continuing..."
-}
-
-# ── Anthropic: 使用 Claude Code 订阅的 OAuth Token ──────────
-# OpenClaw 读取 ANTHROPIC_OAUTH_TOKEN (cr_...) + ANTHROPIC_BASE_URL
+# Key 由 proxy 统一管理，无需各 agent 单独配置
 if [ -z "${ANTHROPIC_OAUTH_TOKEN}" ] || [[ "${ANTHROPIC_OAUTH_TOKEN}" == *"xxx"* ]]; then
-  echo "  [ERROR] ANTHROPIC_OAUTH_TOKEN not set — Claude agents will fail"
+  echo "  [ERROR] ANTHROPIC_OAUTH_TOKEN not set — agents will fail"
   exit 1
 fi
 
-echo "  Registering anthropic provider (Claude Code OAuth)..."
-# 写入 OAuth token
+echo "  Registering anthropic provider (via proxy)..."
 echo "${ANTHROPIC_OAUTH_TOKEN}" | $CLI models auth paste-token \
   --provider "anthropic" \
   --profile-id "anthropic:claude-code" \
   2>/dev/null \
-  && echo "  [OK] anthropic OAuth token registered" \
+  && echo "  [OK] anthropic token registered" \
   || echo "  [WARN] anthropic token registration issue"
 
-# 写入自定义 base URL
+# 写入代理 base URL
 if [ -n "${ANTHROPIC_BASE_URL}" ]; then
   $CLI config set providers.anthropic.baseUrl "${ANTHROPIC_BASE_URL}" 2>/dev/null \
     && echo "  [OK] anthropic baseUrl set: ${ANTHROPIC_BASE_URL}" \
     || echo "  [WARN] could not set baseUrl via config, will rely on env var"
 fi
 
-# Moonshot AI / Kimi (coach)
-register_provider "kimi-coding" "MOONSHOT_API_KEY"
-
-# Google AI Studio (investigator)
-register_provider "google"      "GOOGLE_API_KEY"
-
-# OpenRouter (deduplicator — routes to Qwen)
-register_provider "openrouter"  "OPENROUTER_API_KEY"
-
 # ══════════════════════════════════════════════════════
-#  Step 2: 异构模型分配方案
+#  Step 2: 模型分配（全部走 Anthropic 代理）
 # ══════════════════════════════════════════════════════
 # main         → claude-haiku-4-5     (轻量路由)
-# coach        → kimi-k2-thinking     (中文医药策略推理)
-# investigator → gemini-2.5-flash     (1M ctx，多语种极速)
+# coach        → claude-sonnet-4-6    (策略推理)
+# investigator → claude-haiku-4-5     (高速多语种采集)
 # validator    → claude-sonnet-4-6    (严格 JSON 遵循)
-# deduplicator → qwen3-235b (OpenRouter) (中英日跨语种消歧)
+# deduplicator → claude-sonnet-4-6    (跨语种消歧)
 
 MODEL_MAIN="${MODEL_MAIN:-claude-haiku-4-5-20251001}"
-MODEL_COACH="${MODEL_COACH:-kimi-coding/kimi-k2-thinking}"
-MODEL_INVESTIGATOR="${MODEL_INVESTIGATOR:-google/gemini-2.5-flash}"
+MODEL_COACH="${MODEL_COACH:-claude-sonnet-4-6}"
+MODEL_INVESTIGATOR="${MODEL_INVESTIGATOR:-claude-haiku-4-5-20251001}"
 MODEL_VALIDATOR="${MODEL_VALIDATOR:-claude-sonnet-4-6}"
-MODEL_DEDUPLICATOR="${MODEL_DEDUPLICATOR:-openrouter/qwen/qwen3.5-27b}"
+MODEL_DEDUPLICATOR="${MODEL_DEDUPLICATOR:-claude-sonnet-4-6}"
 
 echo ""
 echo "--- Step 2: Agent model assignments ---"
