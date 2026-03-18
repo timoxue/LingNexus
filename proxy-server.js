@@ -37,6 +37,9 @@ try {
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 1000;  // 1 秒
 
+// 流式超时：两次 chunk 之间最大空闲时间（上游慢时主动断开）
+const STREAM_IDLE_TIMEOUT_MS = 30000;  // 30 秒无数据则断开
+
 console.log('='.repeat(60));
 console.log(' Claude Code Proxy Server (Enhanced)');
 console.log('='.repeat(60));
@@ -47,6 +50,7 @@ console.log('Features:');
 console.log('  - Header conversion: x-api-key → Authorization: Bearer');
 console.log('  - Concurrent request support (stateless)');
 console.log('  - 429 rate limit handling with exponential backoff');
+console.log('  - Stream idle timeout: ' + STREAM_IDLE_TIMEOUT_MS + 'ms');
 console.log('  - Max retries: ' + MAX_RETRIES);
 console.log('='.repeat(60));
 
@@ -176,12 +180,55 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const proxyRes = await makeRequestWithRetry(options, reqBody);
-      const duration = Date.now() - startTime;
+      const firstByteTime = Date.now() - startTime;
 
-      console.log(`  [${requestId}] ← ${proxyRes.statusCode} (${duration}ms)`);
+      console.log(`  [${requestId}] ← ${proxyRes.statusCode} (TTFB: ${firstByteTime}ms)`);
 
       res.writeHead(proxyRes.statusCode, proxyRes.headers);
-      proxyRes.pipe(res);
+
+      // 流式超时检测：手动转发 chunk，监控空闲时间
+      let idleTimer = null;
+      let totalBytes = 0;
+      let streamAborted = false;
+
+      const resetIdleTimer = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          if (!streamAborted) {
+            streamAborted = true;
+            console.error(`  [${requestId}] ⏱️  Stream idle timeout (${STREAM_IDLE_TIMEOUT_MS}ms), aborting`);
+            proxyRes.destroy();
+            res.destroy();
+          }
+        }, STREAM_IDLE_TIMEOUT_MS);
+      };
+
+      resetIdleTimer();  // 启动初始 timer
+
+      proxyRes.on('data', (chunk) => {
+        totalBytes += chunk.length;
+        resetIdleTimer();  // 每次收到数据重置 timer
+        if (!res.destroyed) {
+          res.write(chunk);
+        }
+      });
+
+      proxyRes.on('end', () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        const totalDuration = Date.now() - startTime;
+        console.log(`  [${requestId}] ✓ Stream complete (${totalBytes} bytes, ${totalDuration}ms total)`);
+        if (!res.destroyed) {
+          res.end();
+        }
+      });
+
+      proxyRes.on('error', (err) => {
+        if (idleTimer) clearTimeout(idleTimer);
+        console.error(`  [${requestId}] ❌ Stream error: ${err.message}`);
+        if (!res.destroyed) {
+          res.destroy();
+        }
+      });
     } catch (err) {
       console.error(`  [${requestId}] ❌ Proxy error after ${MAX_RETRIES} retries: ${err.message}`);
       res.writeHead(502, { 'Content-Type': 'application/json' });
