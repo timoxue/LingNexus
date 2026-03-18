@@ -88,6 +88,7 @@ services:
       - "18790:18790"
     volumes:
       - ./proxy-server.js:/app/proxy-server.js:ro
+      - ./proxy-key.txt:/app/key-override.txt
     working_dir: /app
     command: ["node", "proxy-server.js"]
     networks:

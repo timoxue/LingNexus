@@ -7,14 +7,31 @@
  * - 并发请求支持（无状态设计）
  * - 429 错误处理（速率限制）
  * - 指数退避重试机制
+ * - 热更新 API Key（POST /admin/key，无需重启容器）
  */
 
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
 
 const PROXY_PORT = 18790;
 const TARGET_HOST = 'claude-code.club';
 const TARGET_BASE = '/api';
+const KEY_FILE = '/app/key-override.txt';
+
+// 热更新 Key（优先级高于请求头中的 x-api-key）
+let keyOverride = null;
+
+// 启动时从文件加载持久化的 key
+try {
+  const saved = fs.readFileSync(KEY_FILE, 'utf8').trim();
+  if (saved) {
+    keyOverride = saved;
+    console.log(`🔑 Loaded key override from ${KEY_FILE}: ${saved.slice(0, 8)}...`);
+  }
+} catch (_) {
+  // 文件不存在时忽略
+}
 
 // 重试配置
 const MAX_RETRIES = 3;
@@ -81,16 +98,51 @@ async function makeRequestWithRetry(options, reqBody, retryCount = 0) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // ── 管理端点：更新 Key ─────────────────────────────────────────
+  if (req.url === '/admin/key' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+      try {
+        const { key } = JSON.parse(body);
+        if (!key || typeof key !== 'string' || !key.trim()) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Missing or invalid "key" field' }));
+          return;
+        }
+        keyOverride = key.trim();
+        fs.writeFileSync(KEY_FILE, keyOverride, 'utf8');
+        console.log(`[${new Date().toISOString()}] 🔑 Key updated: ${keyOverride.slice(0, 8)}...`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, key_prefix: keyOverride.slice(0, 8) + '...' }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+      }
+    });
+    return;
+  }
+
+  // ── 管理端点：查看当前 Key 状态 ───────────────────────────────
+  if (req.url === '/admin/key' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      key_override: keyOverride ? keyOverride.slice(0, 8) + '...' : null,
+      source: keyOverride ? 'override' : 'per-request (x-api-key header)'
+    }));
+    return;
+  }
+
   const startTime = Date.now();
   const requestId = Math.random().toString(36).substring(7);
 
-  // 提取 x-api-key 并转换为 Bearer token
-  const apiKey = req.headers['x-api-key'];
+  // 优先使用热更新的 key，否则从请求头取
+  const apiKey = keyOverride || req.headers['x-api-key'];
 
   if (!apiKey) {
-    console.error(`[${new Date().toISOString()}] [${requestId}] ❌ Missing x-api-key header`);
+    console.error(`[${new Date().toISOString()}] [${requestId}] ❌ Missing x-api-key header (no override set)`);
     res.writeHead(401, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Missing x-api-key header' }));
+    res.end(JSON.stringify({ error: 'Missing x-api-key header. Set a key via POST /admin/key' }));
     return;
   }
 

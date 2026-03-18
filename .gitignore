@@ -10,6 +10,7 @@
 *_secret
 credentials.json
 secrets.json
+proxy-key.txt
 
 # OpenClaw state and logs
 .openclaw/
