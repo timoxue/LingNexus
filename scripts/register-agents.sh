@@ -83,7 +83,25 @@ register_agent() {
     --non-interactive \
     --json 2>/dev/null \
     && echo "  [OK] ${NAME} registered" \
-    || echo "  [WARN] ${NAME} may already exist, skipping..."
+    || echo "  [INFO] ${NAME} exists, patching workspace..."
+
+  # 强制修正 workspace（agents add 对已存在的 agent 会跳过，需手动 patch openclaw.json）
+  python3 -c "
+import json, sys
+path = '/home/node/.openclaw/openclaw.json'
+with open(path) as f:
+    cfg = json.load(f)
+for a in cfg.get('agents', {}).get('list', []):
+    if a['id'] == '${NAME}':
+        a['name'] = '${NAME}'
+        a['workspace'] = '${WORKSPACE_DIR}'
+        a['agentDir'] = '/home/node/.openclaw/agents/${NAME}/agent'
+        a['model'] = '${MODEL}'
+        break
+with open(path, 'w') as f:
+    json.dump(cfg, f, indent=4)
+print('  [OK] ${NAME} workspace patched -> ${WORKSPACE_DIR}')
+" 2>/dev/null || echo "  [WARN] patch skipped (openclaw.json not found yet)"
 }
 
 register_agent "main"         "${MODEL_MAIN}"
